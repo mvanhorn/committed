@@ -153,6 +153,7 @@ struct BoardLeaderboard: View {
         let board = RankedBoard(store)
         let window = board.window
         let entries = board.entries
+        let rivals = YourRivals.rows(ranked: entries, store: store)
 
         List {
             if summaryPlacement == .leaderboardHeader {
@@ -175,6 +176,10 @@ struct BoardLeaderboard: View {
                     .listRowBackground(Color.clear)
                 }
             } else {
+                if !rivals.isEmpty {
+                    YourRivalsSection(rows: rivals, board: board)
+                }
+
                 Section {
                     if isInitialLoad(entries: entries) {
                         InitialLoadRow()
@@ -195,7 +200,9 @@ struct BoardLeaderboard: View {
                             .listRowBackground(Color.clear)
                     }
                 } header: {
-                    FolioHeader("\(entries.count) \(entries.count == 1 ? "person" : "people") · \(window.shortTitle)")
+                    FolioHeader(rivals.isEmpty
+                                ? "\(entries.count) \(entries.count == 1 ? "person" : "people") · \(window.shortTitle)"
+                                : YourRivals.everyoneHeader(count: entries.count))
                         .padding(.top, 6)
                 }
 
@@ -220,6 +227,34 @@ struct BoardLeaderboard: View {
             guard let standing = store.standing(for: entry.competitor.username, window: store.selectedWindow)
             else { return false }
             return standing.lastUpdated != .distantPast
+        }
+    }
+}
+
+/// Your pinned rivals above everyone, in the shared row with the gap under their name. They stay
+/// in the ranked list too; their ranks here are the same Window's.
+private struct YourRivalsSection: View {
+    @Environment(StandingsStore.self) private var store
+    @Environment(RefreshCoordinator.self) private var refresh
+    let rows: [YourRivals.Row]
+    let board: RankedBoard
+
+    var body: some View {
+        Section {
+            // Keyed by login, not the row's id, so they never share an identity with the same
+            // people's rows in the list below.
+            ForEach(rows, id: \.entry.competitor.username) { row in
+                PersonRowButton(login: row.entry.competitor.username) {
+                    board.row(row.entry, store: store, refresh: refresh, caption: row.gap)
+                }
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 1, leading: 8, bottom: 1, trailing: 8))
+            }
+        } header: {
+            FolioHeader("Your rivals")
+                .padding(.top, 6)
+                .accessibilityAddTraits(.isHeader)
         }
     }
 }
@@ -355,7 +390,9 @@ private struct RankedBoard {
     }
 
     /// The shared row for `entry`, with today's movement on Today, and the person's streak.
-    func row(_ entry: Ranking.Entry, store: StandingsStore, refresh: RefreshCoordinator) -> StandingRow {
+    /// `caption` is a line under the name: Your rivals' gap.
+    func row(_ entry: Ranking.Entry, store: StandingsStore, refresh: RefreshCoordinator,
+             caption: String? = nil) -> StandingRow {
         StandingRow(
             rank: entry.rank,
             competitor: entry.competitor,
@@ -363,7 +400,8 @@ private struct RankedBoard {
             window: window,
             maxContributions: maxContributions,
             rankDelta: refresh.rankDelta(for: entry.competitor.username, in: window),
-            streak: refresh.streak(for: entry.competitor.username)
+            streak: refresh.streak(for: entry.competitor.username),
+            caption: caption
         )
     }
 }
