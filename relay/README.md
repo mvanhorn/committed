@@ -497,9 +497,19 @@ WIDGET_SCREENS=/some/dir npm run test:browser   # also save a screenshot of each
      }
      ```
 
+   - **Streak reminder** (`streakReminder.ts`, with `streakReminder: true`): "Your 40-day
+     streak" / "Nothing yet today. It keeps going if you contribute by midnight." Due from 8 PM
+     local, or an hour before quiet hours start when that falls between noon and 8 PM, while
+     your streak (`currentStreak`) is at least 2 and today's count is 0. Not sent during quiet
+     hours, while your own count is older than 20 minutes (a failing fetch keeps old days, which
+     could wrongly say "nothing yet"), or twice in one local day. One alert push,
+     `apns-collapse-id: streak`, with `"thread-id": "streak"`, no category, `"kind":
+     "streakReminder"` and `"login"` set to your own login (a tap opens your own view). Sending is
+     its own step (`sendStreakReminder`) for the evening summary (#135) to divert.
    - State lives in one JSON column, `notification_state`, keyed by kind
-     (`{"passes": {"window", "date", "counts"}}`). It's saved before anything is sent, so a
-     failure can't send the same pass twice. Later kinds add their own keys.
+     (`{"passes": {"window", "date", "counts"}, "streak": {"date"}}`; `streak.date` is the local
+     day of the last reminder). It's saved before anything is sent, so a failure can't send the
+     same notification twice. Later kinds add their own keys.
    - A dead alert token is cleared (only if it's still the stored one) and logged as
      `token_cleared` with `token: "alert"`.
 

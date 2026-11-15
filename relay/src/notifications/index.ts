@@ -5,6 +5,7 @@ import type { Log } from "../relay";
 import { notifyPasses } from "./passes";
 import { parsePreferences, type NotificationPreferences } from "./preferences";
 import { parseState, type NotificationState } from "./state";
+import { notifyStreakReminder } from "./streakReminder";
 
 /**
  * Relay notifications (spec #124): what the cron cycle sends each installation that has
@@ -40,6 +41,7 @@ export async function runNotifications(
   let state: NotificationState = parseState(row.notification_state);
 
   state = await notifyPasses(context, state, (next) => saveState(row, next, deps), deps);
+  state = await notifyStreakReminder(context, state, (next) => saveState(row, next, deps), deps);
 }
 
 /** State is saved before anything is sent, so a failure mid-send can't send the same thing twice. */
