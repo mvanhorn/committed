@@ -6,32 +6,32 @@
     {
       "file": "story-ahead.png",
       "caption": "Story, you ahead: \"I'm 12 ahead of you, ezra-q.\" (render, not runtime capture)",
-      "capture": { "sourceCommit": "29b20fb1bc74fd9a66bd6a963b6d1d35d1124e58", "fixture": true }
+      "capture": { "sourceCommit": "ffce10ade4d83df66263f34a43ceafeb02b77c9c", "fixture": true }
     },
     {
       "file": "story-behind.png",
       "caption": "Story, they're ahead: \"You're 12 ahead of me, ezra-q.\" with \"Not for long.\" on its own line (render, not runtime capture)",
-      "capture": { "sourceCommit": "29b20fb1bc74fd9a66bd6a963b6d1d35d1124e58", "fixture": true }
+      "capture": { "sourceCommit": "ffce10ade4d83df66263f34a43ceafeb02b77c9c", "fixture": true }
     },
     {
       "file": "story-level.png",
       "caption": "Story, equal totals: \"Dead level, ezra-q.\" (render, not runtime capture)",
-      "capture": { "sourceCommit": "29b20fb1bc74fd9a66bd6a963b6d1d35d1124e58", "fixture": true }
+      "capture": { "sourceCommit": "ffce10ade4d83df66263f34a43ceafeb02b77c9c", "fixture": true }
     },
     {
       "file": "person-challenge.png",
-      "caption": "ezra-q's person view: Challenge under Your race (-ScreenshotPerson ezra-q)",
-      "capture": { "sourceCommit": "29b20fb1bc74fd9a66bd6a963b6d1d35d1124e58", "fixture": true }
+      "caption": "ezra-q's person view: Challenge under Your race, above the Weekly record (-ScreenshotPerson ezra-q)",
+      "capture": { "sourceCommit": "ffce10ade4d83df66263f34a43ceafeb02b77c9c", "fixture": true }
     },
     {
       "file": "person-yours.png",
       "caption": "Your own person view: no race and no Challenge (-ScreenshotPerson ari-linden)",
-      "capture": { "sourceCommit": "29b20fb1bc74fd9a66bd6a963b6d1d35d1124e58", "fixture": true }
+      "capture": { "sourceCommit": "ffce10ade4d83df66263f34a43ceafeb02b77c9c", "fixture": true }
     },
     {
       "file": "share-sheet.png",
       "caption": "Share sheet with the story image, opened by itself once the race loaded, through AppModel.requestChallenge (-ScreenshotChallenge ezra-q, the path #137's Share your race will use)",
-      "capture": { "sourceCommit": "29b20fb1bc74fd9a66bd6a963b6d1d35d1124e58", "fixture": true }
+      "capture": { "sourceCommit": "ffce10ade4d83df66263f34a43ceafeb02b77c9c", "fixture": true }
     }
   ]
 }
