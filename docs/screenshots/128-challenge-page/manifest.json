@@ -1,0 +1,47 @@
+{
+  "device": "T3 Code in-app browser, 393 × 1380 CSS px viewport at 2x (iPhone width)",
+  "os": "macOS 27.0",
+  "notes": "Runtime captures of `next start` (production build of site/) with NEXT_PUBLIC_COMMITTED_RELAY_URL pointed at a local stub of the relay's GET /v1/race. The stub serves fixed calendars (fictional rivals ezra-q, odile-m and ana; addisonk is the site's existing demo handle) and works out the lead with the relay's own rules; ghost is unknown, so the relay answers 404. The error page is 393 × 852. OG images are the route's opengraph-image PNGs (1200 × 630) fetched from the same server. Windows reads \"coming soon\" because NEXT_PUBLIC_WINDOWS_DOWNLOAD_AVAILABLE was unset, as in production until the Windows release. No before state: the page is new.",
+  "screenshots": [
+    {
+      "file": "page-challenger-ahead.png",
+      "caption": "Challenge page, the challenger ahead: \"addisonk is 12 ahead of you.\", race card 400 vs 412, \"They passed you on November 9. The lead changed 4 times.\"",
+      "capture": { "sourceCommit": "b03c3e86805109d2eab77d6e096ceb4e62234b86", "fixture": true }
+    },
+    {
+      "file": "page-friend-ahead.png",
+      "caption": "Challenge page, the friend ahead: \"You're 5 ahead of addisonk.\", \"You pulled ahead on October 19.\"",
+      "capture": { "sourceCommit": "b03c3e86805109d2eab77d6e096ceb4e62234b86", "fixture": true }
+    },
+    {
+      "file": "page-level.png",
+      "caption": "Challenge page, level: \"You and addisonk are level.\", \"You caught them on November 12.\"",
+      "capture": { "sourceCommit": "b03c3e86805109d2eab77d6e096ceb4e62234b86", "fixture": true }
+    },
+    {
+      "file": "page-error.png",
+      "caption": "Challenge page, unknown login: \"We couldn't load this race right now.\" with the download buttons",
+      "capture": { "sourceCommit": "b03c3e86805109d2eab77d6e096ceb4e62234b86", "fixture": true }
+    },
+    {
+      "file": "og-challenger-ahead.png",
+      "caption": "Link preview image, challenger ahead: \"30 DAYS · 412 – 400\", \"I'm 12 ahead of you, ezra-q.\" on the square field",
+      "capture": { "sourceCommit": "b03c3e86805109d2eab77d6e096ceb4e62234b86", "fixture": true, "device": "next/og ImageResponse, 1200 × 630" }
+    },
+    {
+      "file": "og-friend-ahead.png",
+      "caption": "Link preview image, friend ahead: \"You're 5 ahead of me, odile-m. Not for long.\" (the login stays whole across the wrap)",
+      "capture": { "sourceCommit": "b03c3e86805109d2eab77d6e096ceb4e62234b86", "fixture": true, "device": "next/og ImageResponse, 1200 × 630" }
+    },
+    {
+      "file": "og-level.png",
+      "caption": "Link preview image, level: \"30 DAYS · 320 – 320\", \"Dead level, ana.\"",
+      "capture": { "sourceCommit": "b03c3e86805109d2eab77d6e096ceb4e62234b86", "fixture": true, "device": "next/og ImageResponse, 1200 × 630" }
+    },
+    {
+      "file": "og-error.png",
+      "caption": "Link preview image when the race can't be read: \"addisonk challenged you on Committed\"",
+      "capture": { "sourceCommit": "b03c3e86805109d2eab77d6e096ceb4e62234b86", "fixture": true, "device": "next/og ImageResponse, 1200 × 630" }
+    }
+  ]
+}

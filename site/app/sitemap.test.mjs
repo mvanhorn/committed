@@ -8,3 +8,7 @@ test("the sitemap lists the home, privacy and support pages", () => {
     ["https://gitcommitted.app", "https://gitcommitted.app/privacy", "https://gitcommitted.app/support"],
   );
 });
+
+test("challenge pages stay out of the sitemap", () => {
+  assert.ok(sitemap().every(({ url }) => !new URL(url).pathname.startsWith("/vs")));
+});

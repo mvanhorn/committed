@@ -142,6 +142,7 @@ The **Committed relay** is a small push service that keeps Live rank current whi
 - **Passes** are checked every 5 minutes, after Live rank's updates, with the same rule as the app (`RankChangeDetector`: was at or below you, now strictly above you, or the reverse; holding a tie sends nothing), among the visible people on your board, on Today. Each sends one notification with the shipped copy ("😤 alice passed you", "They're ahead 7–5. Time to catch up!", or "🎉 You passed alice!", "You're ahead 12–9. Keep climbing!"). Hidden people are never on the board it has, so they're never mentioned. Its first check, and the first after your local midnight, only takes a baseline. The relay keeps a small per-iPhone notification state (the last counts it judged), deleted with the registration. A notification token Apple rejects for good is forgotten until the app sends a new one.
 - **What it never receives:** your GitHub token, which is sent only to GitHub. The relay reads the same public contribution pages as the apps, anonymously.
 - **The Kraken page's reads** send a username, its rivals, the Window and a time zone with each request. The relay stores nothing from them beyond the shared per-username contribution cache.
+- **The challenge page's reads** (`GET /v1/race`, below) send the two usernames in the link. Like the Kraken page's, they're public, unauthenticated, and store nothing beyond that cache.
 - **When the iPhone updates it:** when you hide or show someone, change Live rank's Window, when a people sync changes who's on your board, when your time zone changes, and when Apple issues a new push token.
 - **Turning off both Live rank and Leaderboard Notifications, or Disconnect GitHub,** deletes the iPhone's registration and ends Live rank. Turning off only one keeps the other going.
 
@@ -197,11 +198,21 @@ Installed copies use **Sparkle** for updates. With automatic updates enabled, th
 
 The app is intentionally **not sandboxed** to support its Sparkle update path. Bundle and target names remain `CommitStandings` / `com.digg.commitstandings` for update continuity; the product name is **Committed**.
 
+### Challenge page
+
+**gitcommitted.app/vs/<challenger>/<friend>** is the page a challenge link opens: the challenger's 30-day race with a friend, told from the friend's side. It's a web page, not part of the apps, and needs no Committed app or GitHub connection to read.
+
+- **The page:** "You've been challenged", then the headline ("addisonk is 12 ahead of you.", "You're 5 ahead of addisonk." or "You and addisonk are level."), "Over the last 30 days, from both your public GitHub contribution graphs. Updated 3 minutes ago.", and a race card: both 30-day totals ("You" in lime), both running totals over the 30 days with the latest change of lead marked, and who passed whom from the friend's side ("They passed you on November 9.", plus "The lead changed 3 times." when it did; "You pulled ahead…", "They caught you…", "They've led for all 30 days" or "Level for all 30 days", as in the person view's **Your race**). Under it: **Get Committed for iPhone** (the App Store), **Mac** and **Windows** (the site's download links, with Windows "coming soon" until its release), and "You're on addisonk's board. Committed ranks people you follow on GitHub, so follow addisonk to race them back. Free, no account.", where "follow addisonk" opens their GitHub profile.
+- **Link preview:** the title is "addisonk challenged you on Committed", and the image shows "30 DAYS · 412 – 400" and the challenger's words to the friend ("I'm 12 ahead of you, ezra-q.", "You're 5 ahead of me, ezra-q. Not for long." or "Dead level, ezra-q.") over a field of contribution squares.
+- **Counts** come from the relay's `GET /v1/race` when the page or preview is requested, reused for a minute: the Board's 30 days Window for both people, from the same public contribution graphs. The link carries no time zone, so the page's days are UTC days; the app's own race uses yours, so near midnight the two can disagree by a day's count.
+- **When it can't load** (an unknown login, a malformed link, the relay or GitHub failing), it says "We couldn't load this race right now." and still offers the downloads.
+- It's `noindex`, and it stays out of the sitemap.
+
 ## What it doesn't do today
 
 - **No shared/team board or settings sync.** Each person has their own leaderboard. Connecting the same GitHub account on another Mac, PC, or iPhone derives the same accessible people from GitHub, but visibility preferences remain local. The only server is the **Committed relay**, which holds just what Live rank and relay notifications need on one iPhone (public usernames, Window, time zone, notification choices, pinned rivals, push tokens); it doesn't sync boards or settings.
 - **Public contribution graph only.** Private activity is included only if the person enables **Contribution settings → Private contributions** on their GitHub profile. A dismissible board tip explains this; the guidance remains available in **About Committed**. Connecting requests `read:org read:user` to load profile and organization membership information. It does not request `repo` access or read repository contents.
-- **No web app.** The leaderboard lives in the Mac menu bar, the Windows notification area, and the iPhone app. On desktop, standalone windows cover connecting GitHub, People, and the contributions explanation; on iPhone they are tabs and screens in the app.
+- **No web app.** The leaderboard lives in the Mac menu bar, the Windows notification area, and the iPhone app. The web pages that show counts (the Kraken page and the challenge page) read public graphs through the relay; neither signs in or shows your board. On desktop, standalone windows cover connecting GitHub, People, and the contributions explanation; on iPhone they are tabs and screens in the app.
 
 ## Glossary
 
