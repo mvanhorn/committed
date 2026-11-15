@@ -17,7 +17,7 @@ import UIKit
 /// (`-ScreenshotPersonEnd` scrolls it to the end),
 /// `-ScreenshotTroll <login>` gives that person a trolling day (784 more, the troll face),
 /// `-ScreenshotRecordDay <n>` makes your count today n (a big one sets a record: the record card
-/// and New tiles in Your records), `-ScreenshotHide` takes several logins separated by commas,
+/// and New tiles in Your records; `-ScreenshotShareRecord` then taps the card's Share), `-ScreenshotHide` takes several logins separated by commas,
 /// `-ScreenshotCountScale <n>` multiplies everyone's counts by n (30 puts every 30-day count in
 /// the thousands beside the streaks, the board's widest rows), and
 /// `-LiveRankPayload <file.json>` shows a Live Activity push payload's content state in Live rank,
@@ -75,6 +75,12 @@ enum ScreenshotFixture {
     /// Debug launch.
     static var opensShare: Bool {
         ProcessInfo.processInfo.arguments.contains("-ScreenshotShare")
+    }
+
+    /// `-ScreenshotShareRecord`: tap the record card's Share a few seconds after launch, once the
+    /// board has loaded, so captures can show the share sheet with the card's image.
+    static var sharesRecord: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotShareRecord")
     }
 
     /// Live rank settings for the fixture, in memory: never chosen, or accepted and on with

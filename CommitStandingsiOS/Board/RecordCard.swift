@@ -122,10 +122,7 @@ struct BoardRecordCard: View {
 
     var body: some View {
         RecordCardView(record: record, actions: .init(
-            share: {
-                sharing = (try? RecordShareRenderer.file(record, login: model.store.selfCompetitor?.username))
-                    .map(SharedRecord.init)
-            },
+            share: share,
             seeRecords: { model.showYourRecords() },
             dismiss: {
                 withAnimation(.snappy) { model.dismissRecordCard(record) }
@@ -137,6 +134,18 @@ struct BoardRecordCard: View {
                 .presentationDetents([.medium, .large])
                 .ignoresSafeArea()
         }
+        #if DEBUG
+        .task {
+            guard ScreenshotFixture.sharesRecord else { return }
+            try? await Task.sleep(for: .seconds(3))
+            share()
+        }
+        #endif
+    }
+
+    private func share() {
+        sharing = (try? RecordShareRenderer.file(record, login: model.store.selfCompetitor?.username))
+            .map(SharedRecord.init)
     }
 }
 
