@@ -73,11 +73,15 @@ enum ScreenshotFixture {
     /// notification about `login`, as if `action` (`SHARE_RACE`, `OPEN_BOARD`, or iOS's body-tap
     /// identifier) had been chosen with Committed closed. Once the fixture's people load, it goes
     /// through the notification delegate's own route (`ForegroundNotificationPresenter.receive`).
-    /// No notification is shown or tapped.
+    /// No notification is shown or tapped. `-ScreenshotNotificationKind closeCall` makes it a relay
+    /// close call (#132) instead, which has no category.
     static var notificationResponse: DeepLink? {
         guard let raw = value(after: "-ScreenshotNotificationResponse"),
               let colon = raw.lastIndex(of: ":") else { return nil }
         let action = String(raw[..<colon]), login = String(raw[raw.index(after: colon)...])
+        if value(after: "-ScreenshotNotificationKind") == "closeCall" {
+            return DeepLink(notification: ["kind": "closeCall", "login": login], action: action)
+        }
         return DeepLink(notification: ["kind": "pass", "login": login, "aps": ["category": DeepLink.passCategory]],
                         action: action)
     }
