@@ -77,9 +77,9 @@ struct NotificationPreferences: Codable, Equatable, Sendable {
 /// The "any switch" gate (#130): the kinds of notification, and the choices on first opt-in.
 extension NotificationPreferences {
     /// Each kind's switch besides Passes.
-    static let kindSwitches: [WritableKeyPath<NotificationPreferences, Bool>] = [
-        \.closeCalls, \.results, \.records, \.streakReminder,
-    ]
+    static var kindSwitches: [WritableKeyPath<NotificationPreferences, Bool>] {
+        [\.closeCalls, \.results, \.records, \.streakReminder]
+    }
 
     /// At least one kind of notification is on: relay notifications are on only then.
     var anyKindOn: Bool {
