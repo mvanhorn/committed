@@ -116,8 +116,9 @@ Registers or updates. `{id}` is 8 to 64 characters of `[A-Za-z0-9-]`; a UUID wor
   activity, as `DELETE` does) and return `204`; they never create one.
 - Turning `liveRank` off ends the current activity and forgets Live rank's tokens. The relay
   keeps the alert token only while `notifications` is set.
-- Quiet hours, `delivery`, `rivals` filtering and the kinds after passes are stored now and take
-  effect in later tickets (#130–#135).
+- Passes act on `window`, `passes` (`"rivals"` sends only pinned rivals' passes) and quiet hours
+  (#130). `delivery` and the kinds after passes are stored now and take effect in later tickets
+  (#131–#135).
 - At most 1,000 competitors, self included.
 - Returns `201` on creation, `200` on update.
 - A changed competitor list resets today's movement baseline, as a visibility change does in
@@ -473,6 +474,14 @@ WIDGET_SCREENS=/some/dir npm run test:browser   # also save a screenshot of each
      preferences' Window among the visible board, against the counts of the previous run. The
      first look, a new local day and a new Window take a fresh baseline silently. While your
      own count is missing, the last baseline is kept.
+   - With `passes: "rivals"`, only crossings with your pinned `rivals` are sent (none while
+     nobody is pinned). The baseline still holds everyone visible, so pinning someone or
+     switching between everyone and rivals never replays an earlier pass.
+   - **Quiet hours** (`quietHours.ts`, `isQuietHours`) are judged on the installation's local
+     clock, start inclusive and end exclusive, wrapping past midnight when the end is earlier
+     (the default, 22:00–08:00). Off, or the same start and end, is never quiet. A pass during
+     quiet hours is still sent, with `"interruption-level": "passive"` and no `sound`. Later
+     kinds use the same check.
    - Each pass is one alert push: `apns-push-type: alert`, `apns-topic: <APNS_BUNDLE_ID>`,
      priority 10, `apns-collapse-id: pass.<login>`, with the shipped copy from
      `NotificationService.copy(for:)`:

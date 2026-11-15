@@ -2,6 +2,7 @@ import { competitorsOf, standingsFor } from "../board";
 import { localDate } from "../parser";
 import { sendAlert } from "./alerts";
 import type { NotificationContext, NotificationDeps } from "./index";
+import { isQuietHours } from "./quietHours";
 import type { NotificationState, PassesState } from "./state";
 
 /**
@@ -69,9 +70,12 @@ export function passCopy(event: PassEvent): { title: string; body: string } {
 
 /**
  * Sends a `PASS` alert for each crossing since the last look, among the visible people on the
- * board, on the preferences' Window. The first look, a new local day and a new Window take a
- * baseline silently (as `RefreshCoordinator` re-baselines across a reset). While your own count is
- * missing, the last baseline is kept so the next real pass still fires.
+ * board, on the preferences' Window; with `passes: "rivals"`, only your pinned rivals' crossings.
+ * The first look, a new local day and a new Window take a baseline silently (as
+ * `RefreshCoordinator` re-baselines across a reset). The baseline always holds everyone visible,
+ * so pinning someone or switching between Everyone and Pinned rivals never replays an old pass.
+ * While your own count is missing, the last baseline is kept so the next real pass still fires.
+ * During quiet hours a pass still goes out, passively and with no sound.
  */
 export async function notifyPasses(
   context: NotificationContext,
@@ -95,7 +99,9 @@ export async function notifyPasses(
 
   const last = state.passes;
   const comparable = last && last.window === preferences.window && last.date === today ? last.counts : null;
-  const events = crossings(comparable, counts, row.login);
+  const rivals = preferences.passes === "rivals" ? new Set(JSON.parse(row.rivals_json) as string[]) : null;
+  const events = crossings(comparable, counts, row.login).filter((event) => !rivals || rivals.has(event.rival));
+  const quiet = isQuietHours(now, row.time_zone, preferences.quietHours);
   const passes: PassesState = { window: preferences.window, date: today, counts };
   const next = { ...state, passes };
   await save(next);
@@ -105,7 +111,12 @@ export async function notifyPasses(
     await sendAlert(
       row,
       {
-        aps: { alert: passCopy(event), sound: "default", category: "PASS", "thread-id": "passes" },
+        aps: {
+          alert: passCopy(event),
+          ...(quiet ? { "interruption-level": "passive" as const } : { sound: "default" as const }),
+          category: "PASS",
+          "thread-id": "passes",
+        },
         kind: "pass",
         login: event.rival,
       },
