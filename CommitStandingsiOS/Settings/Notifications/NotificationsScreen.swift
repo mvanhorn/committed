@@ -7,12 +7,12 @@ import SwiftUI
 /// `AboutYourRivalsSection` (Close calls #132), and bind it with `model.notificationChoice(_:)`,
 /// which saves the choice for this account and updates the relay registration right away.
 ///
-/// Not settled yet, and needed before those switches mean anything on their own: relay
-/// notifications are on only while **Passes** is (`AppModel.relayNotificationsOn` reads the Passes
-/// switch), and only Passes asks for iOS permission and relay consent
-/// (`leaderboardNotificationsChanged`). With Passes off, a choice is saved but the relay hears
-/// `notifications: null`. A kind that should work with Passes off needs that gate widened (sending
-/// `passes: "off"` instead) and one shared "a switch turned on" step for permission and consent.
+/// The gate (`AppModel.relayNotificationsOn`): relay notifications are on with relay consent, iOS
+/// permission, and any kind on; Passes off sends `passes: "off"`, and only every kind off sends
+/// `notifications: null`. A `Bool` choice turned on through `notificationChoice` takes the shared
+/// step (`AppModel.setNotificationChoice`): iOS's permission prompt the first time, then relay
+/// consent, then the spec defaults with that switch on. Until then every switch reads off. New
+/// switches need nothing more than the binding.
 ///
 /// In a build without the relay, on the Sample board, and after **Not Now**, only Passes shows,
 /// working as it always has: in the app, while it's open (`AppModel.showsRelayNotificationChoices`).
@@ -53,7 +53,7 @@ extension AppModel {
         Binding(
             get: { self.notificationChoices[keyPath: keyPath] },
             set: { value in
-                Task { @MainActor in await self.updateNotificationChoices { $0[keyPath: keyPath] = value } }
+                Task { @MainActor in await self.setNotificationChoice(keyPath, value) }
             }
         )
     }

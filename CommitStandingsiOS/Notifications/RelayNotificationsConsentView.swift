@@ -2,7 +2,8 @@ import SwiftUI
 
 /// "Get notifications with Committed closed?": asked once, the first time relay notifications would
 /// turn on for someone who hasn't agreed to them, such as after accepting the earlier relay sheet
-/// (Live rank only), or turning on Passes (Settings ▸ Notifications) without ever seeing the relay sheet.
+/// (Live rank only), or turning on any notification switch (Settings ▸ Notifications) without ever
+/// seeing the relay sheet.
 /// It says what the relay receives for them. **Turn On** starts relay notifications and leaves
 /// Live rank as it is; **Not Now** keeps the in-app notifications.
 struct RelayNotificationsConsentView: View {
@@ -37,7 +38,7 @@ struct RelayNotificationsConsentView: View {
                     }
                     .padding(.horizontal, 16)
                     .tileCard()
-                    Text("Not Now keeps notifications from Committed while it's open. Turning Passes off in Settings ▸ Notifications, or disconnecting GitHub, stops relay notifications.")
+                    Text("Not Now keeps notifications from Committed while it's open. Turning every notification off in Settings ▸ Notifications, or disconnecting GitHub, stops relay notifications.")
                         .font(.footnote)
                         .foregroundStyle(Color.muted)
                 }

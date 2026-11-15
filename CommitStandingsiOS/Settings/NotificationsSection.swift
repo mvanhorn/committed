@@ -4,12 +4,11 @@ import SwiftUI
 /// Leaderboard Notifications switch.
 struct NotificationsSection: View {
     @Environment(AppModel.self) private var model
-    @AppStorage(NotificationService.enabledDefaultsKey) private var passesOn = false
 
     var body: some View {
         Section {
             NavigationLink(value: SettingsRoute.notifications) {
-                LabeledContent("Notifications", value: passesOn ? "On" : "Off")
+                LabeledContent("Notifications", value: model.notificationsOn ? "On" : "Off")
             }
         } header: {
             FolioHeader("Notifications")
