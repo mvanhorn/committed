@@ -1,0 +1,55 @@
+{
+  "device": "iPhone Duo Simulator (94D56458-B90B-484A-BA5E-16748D2CBEE5), closed, portrait",
+  "os": "iOS 27.1",
+  "notes": "Runtime captures (xcrun simctl io screenshot --display=1) of a Debug build on the persistent iPhone Duo, inside apple-session run. Launched with -ScreenshotFixture -ScreenshotDate 2026-11-12T19:00:00Z -dismissedPrivateContribTip YES -ScreenshotTab board, plus -ScreenshotRecordDay 60 (your count today is 60: a record day), -ScreenshotShareRecord (taps the card's Share), -ScreenshotPerson ari-linden (your own view) and -ScreenshotHide ines-volk,odile-m,ezra-q,bram-ott,niko-vane (no rivals). Sample board data; avatars are generated identicons; nothing is fetched. No before images: Your records and the record card are new surfaces; board-no-record.png shows the Board unchanged without a record. Not captured: the open iPhone Duo (needs Xcode's device tools to unfold) and the dashed First week at #1 tile with \"You're #3 this week\" (the Sample board's seeded calendars always have a week Ari led; PersonalRecordsTests covers that caption).",
+  "screenshots": [
+    {
+      "file": "board-record-card.png",
+      "caption": "Board \u2014 the record card on a day you set a best day: \"New record\", \"60 today. Your best day in the past year.\", \"Your old best was 13, on October 31.\", with Share, See your records and dismiss, above your summary",
+      "capture": {
+        "sourceCommit": "98321eb752d182dba386203c30d3cae220fadfa2",
+        "fixture": true
+      }
+    },
+    {
+      "file": "record-card-share.png",
+      "caption": "Board \u2014 Share on the record card opens the system share sheet with the card's 1080 \u00d7 1080 PNG (preview thumbnail top left)",
+      "capture": {
+        "sourceCommit": "98321eb752d182dba386203c30d3cae220fadfa2",
+        "fixture": true
+      }
+    },
+    {
+      "file": "your-records-new.png",
+      "caption": "Your own person view \u2014 Your records on a record day: Best day, Best week and Best 30 days with the lime outline and New badge; Longest streak, Days at #1 and First week at #1 without",
+      "capture": {
+        "sourceCommit": "98321eb752d182dba386203c30d3cae220fadfa2",
+        "fixture": true
+      }
+    },
+    {
+      "file": "your-records.png",
+      "caption": "Your own person view \u2014 Your records on an ordinary day: every tile with its number and when (\"Oct 31\", \"Oct 19 \u2013 25\", \"Ended Aug 21\", \"Most recent: Nov 5\", \"Ended Nov 9\", \"Dec 8 \u2013 14\"), no New badges",
+      "capture": {
+        "sourceCommit": "98321eb752d182dba386203c30d3cae220fadfa2",
+        "fixture": true
+      }
+    },
+    {
+      "file": "your-records-no-rivals.png",
+      "caption": "Your own person view \u2014 everyone else hidden: Days at #1 and First week at #1 are dashed \"Not yet\" tiles captioned \"Needs a rival\"",
+      "capture": {
+        "sourceCommit": "98321eb752d182dba386203c30d3cae220fadfa2",
+        "fixture": true
+      }
+    },
+    {
+      "file": "board-no-record.png",
+      "caption": "Board \u2014 an ordinary day with no record: no card, the Board as before",
+      "capture": {
+        "sourceCommit": "98321eb752d182dba386203c30d3cae220fadfa2",
+        "fixture": true
+      }
+    }
+  ]
+}
