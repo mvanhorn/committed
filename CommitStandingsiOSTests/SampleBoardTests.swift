@@ -284,7 +284,8 @@ struct SampleBoardTests {
 
     // MARK: Live rank and the widgets (#68)
 
-    private var registered: [LiveRankConfiguration] { relay.configurations.compactMap { $0 } }
+    /// Boards sent with Live rank on (with it off, the board goes only for relay notifications).
+    private var registered: [LiveRankConfiguration] { relay.configurations.compactMap { $0 }.filter(\.liveRank) }
 
     @Test func liveRankStartsOnThePhoneOnlyEvenWithARelayConfigured() async throws {
         let model = launch()
@@ -398,7 +399,10 @@ struct SampleBoardTests {
         #expect(activities.running.map(\.selfLogin) == ["me"])
         #expect(activities.startedPushUpdates == [.none, .token])
         #expect(activities.startedAttributes.map(\.isSampleBoard) == [true, nil])
-        #expect(preferences.load() == LiveRankPreferences(isEnabled: true, window: .daily, relayDisclosureAccepted: true))
+        #expect(preferences.load() == LiveRankPreferences(
+            isEnabled: true, window: .daily, relayDisclosureAccepted: true,
+            relayDisclosureVersion: RelayConsent.currentVersion, relayNotifications: true
+        ))
     }
 
     @Test func turningLiveRankOffOnTheSampleBoardStillOffersTheDisclosureAfterConnecting() async {
@@ -440,6 +444,7 @@ struct SampleBoardTests {
         #expect(rosterCalls.count == 0)
         // Live rank runs on the phone only: never registered with the relay, no push token asked.
         #expect(relay.configurations.compactMap { $0 }.isEmpty)
+        #expect(relay.notifications.compactMap { $0 }.isEmpty)
         #expect(!activities.startedPushUpdates.isEmpty)
         #expect(activities.startedPushUpdates.allSatisfy { $0 == .none })
         #expect(!model.isShowingLiveRankDisclosure)

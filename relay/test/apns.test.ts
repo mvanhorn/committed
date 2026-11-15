@@ -83,6 +83,38 @@ describe("HTTP APNs sender", () => {
     expect(calls[1]!.url.startsWith("https://api.push.apple.com/3/device/")).toBe(true);
   });
 
+  it("posts an alert push to the app's own topic, with its collapse id", async () => {
+    const { pem } = await p8();
+    const calls: { url: string; init: RequestInit }[] = [];
+    const sender = createHttpApnsSender({
+      keyId: "KEY1234567",
+      teamId: "TEAM123456",
+      privateKey: pem,
+      bundleId: "com.example.app",
+      now: () => 1_793_800_000,
+      fetch: async (input, init) => {
+        calls.push({ url: String(input), init: init! });
+        return new Response(null, { status: 200 });
+      },
+    });
+    const payload = {
+      aps: { alert: { title: "😤 alice passed you", body: "They're ahead 9–5. Time to catch up!" }, sound: "default", category: "PASS", "thread-id": "passes" },
+      kind: "pass",
+      login: "alice",
+    } as const;
+
+    await sender.send({ pushType: "alert", token: "ef".repeat(32), environment: "production", priority: 10, payload, collapseId: "pass.alice" });
+
+    const { url, init } = calls[0]!;
+    expect(url).toBe(`https://api.push.apple.com/3/device/${"ef".repeat(32)}`);
+    const headers = init.headers as Record<string, string>;
+    expect(headers["apns-push-type"]).toBe("alert");
+    expect(headers["apns-topic"]).toBe("com.example.app");
+    expect(headers["apns-priority"]).toBe("10");
+    expect(headers["apns-collapse-id"]).toBe("pass.alice");
+    expect(JSON.parse(init.body as string)).toEqual(payload);
+  });
+
   it("caches the provider token for under an hour", async () => {
     const { pem } = await p8();
     const clock = new Clock(1_793_800_000);

@@ -68,9 +68,16 @@ final class FakeLiveRankActivities: LiveRankActivities {
 final class FakeLiveRankRelay: LiveRankRegistrar {
     var pushUpdates: LiveRankPushUpdates = .none
     private(set) var configurations: [LiveRankConfiguration?] = []
+    /// What relay notifications were told, in order (nil = off).
+    private(set) var notifications: [RelayNotificationsConfiguration?] = []
+    /// Whether the relay delivers passes (registered with notifications and an alert token).
+    var deliversNotifications = false
     private(set) var retries = 0
     func liveRankDidChange(_ configuration: LiveRankConfiguration?) async {
         configurations.append(configuration)
+    }
+    func relayNotificationsDidChange(_ configuration: RelayNotificationsConfiguration?) async {
+        notifications.append(configuration)
     }
     func retryPendingWork() async {
         retries += 1
@@ -365,7 +372,8 @@ struct LiveRankLifecycleTests {
             LiveRankConfiguration(selfLogin: "me", competitors: ["me", "ada", "bo"], window: .daily),
             LiveRankConfiguration(selfLogin: "me", competitors: ["me", "ada"], window: .daily),
             LiveRankConfiguration(selfLogin: "me", competitors: ["me", "ada"], window: .weekly),
-            nil,
+            // Off, the board still goes to the relay (for relay notifications), marked Live rank off.
+            LiveRankConfiguration(selfLogin: "me", competitors: ["me", "ada"], window: .weekly, liveRank: false),
         ])
     }
 

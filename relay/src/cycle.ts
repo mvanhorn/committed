@@ -11,6 +11,7 @@ import { competitorsOf, deriveBoard, loginData, type LoginData } from "./board";
 import type { InstallationRow, Store } from "./db";
 import type { LiveRankState } from "./liveRank";
 import { parseDays } from "./parser";
+import { runNotifications } from "./notifications";
 import type { GitHubFetch, GitHubNameFetch, Log } from "./relay";
 
 export interface CycleDeps {
@@ -51,6 +52,14 @@ export async function runCycle(deps: CycleDeps): Promise<void> {
       deps.log("installation_failed", { id: row.id, error: String(error) });
     }
   }
+  // Relay notifications, after every Live rank push, from the same contribution data.
+  for (const row of installations) {
+    try {
+      await runNotifications(row, data, deps, now);
+    } catch (error) {
+      deps.log("notifications_failed", { id: row.id, error: String(error) });
+    }
+  }
   // After the pushes, so a slow or failing GitHub API never delays Live rank.
   for (const row of installations) await lookUpDisplayName(row, deps, now);
   deps.log("cycle_complete", { installations: installations.length, logins: logins.size });
@@ -70,7 +79,10 @@ async function runInstallation(
   }
   const previous = row.last_state_json ? (JSON.parse(row.last_state_json) as LiveRankState) : null;
 
-  if (row.activity_push_token) {
+  if (!row.live_rank) {
+    // Live rank is off (relay notifications only): never start, update or rotate an activity.
+    // The movement baseline above is still recorded; the board route reads it.
+  } else if (row.activity_push_token) {
     const startedAt = row.activity_started_at ?? now;
     if (now - startedAt >= ROTATE_AFTER_SECONDS) {
       await send(row, "activity", endPayload(previous ?? state, now), 10, deps);

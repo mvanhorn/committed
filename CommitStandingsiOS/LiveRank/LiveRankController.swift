@@ -93,17 +93,41 @@ final class LiveRankController {
         requiresRelayDisclosure && preferences.isEnabled != false
     }
 
-    /// The person read what the relay receives and turned Live rank on.
+    /// The person read what the relay receives and turned Live rank on. The sheet also covers
+    /// relay notifications, so they're agreed to as well (they still follow the notifications switch).
     func acceptRelayDisclosure() async {
         preferences.relayDisclosureAccepted = true
+        preferences.relayDisclosureVersion = RelayConsent.currentVersion
+        preferences.relayNotifications = true
         await setEnabled(true)
     }
 
     /// "Not Now": Live rank stays off, and the disclosure isn't offered again until the switch is
-    /// turned on.
+    /// turned on. Relay notifications, which the sheet also covers, aren't offered on their own
+    /// straight after; the in-app ones carry on.
     func declineRelayDisclosure() async {
+        if preferences.relayNotifications == nil { preferences.relayNotifications = false }
         await setEnabled(false)
     }
+
+    // MARK: - Relay notifications
+
+    /// Relay notifications: nil until asked, true agreed, false declined ("Not Now").
+    var relayNotificationsChoice: Bool? { preferences.relayNotifications }
+
+    /// "Turn On" or "Not Now" in the short sheet ("Get notifications with Committed closed?").
+    func setRelayNotificationsChoice(_ accepted: Bool) {
+        preferences.relayNotifications = accepted
+        preferenceStore.save(preferences)
+    }
+
+    /// Tell the relay the notification choices (nil = relay notifications off).
+    func relayNotificationsDidChange(_ configuration: RelayNotificationsConfiguration?) async {
+        await relay.relayNotificationsDidChange(configuration)
+    }
+
+    /// The relay is delivering passes, so the app posts none of its own.
+    var relayDeliversNotifications: Bool { relay.deliversNotifications }
 
     /// Try again whatever the relay couldn't send earlier.
     func retryRelay() async {
@@ -177,10 +201,21 @@ final class LiveRankController {
 
     private func syncOnce() async {
         let running = activities.current()
-        guard isEnabled, isSignedIn() else {
+        guard isSignedIn() else {
             for activity in running { await activities.end(id: activity.id) }
             await tellRelay(nil)
             status = isEnabled ? .waiting : .off
+            return
+        }
+        guard isEnabled else {
+            for activity in running { await activities.end(id: activity.id) }
+            // The board still reaches the relay, which keeps it only while relay notifications are on.
+            if let me = store.selfCompetitor?.username {
+                await tellRelay(LiveRankConfiguration(
+                    selfLogin: me, competitors: store.visibleCompetitors.map(\.username), window: window, liveRank: false
+                ))
+            }
+            status = .off
             return
         }
         // Connected, but your board hasn't loaded yet: leave any activity as it is.
