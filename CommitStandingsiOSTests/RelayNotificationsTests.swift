@@ -318,6 +318,22 @@ struct RelayNotificationsTests {
         #expect(ForegroundNotificationPresenter.categories.count == 1)
     }
 
+    @Test func aResponseBeforeTheAppIsReadyWaitsForIt() {
+        // A cold launch: iOS hands over the response before RootView attaches `open`.
+        let attached = ForegroundNotificationPresenter.open
+        defer { ForegroundNotificationPresenter.open = attached }
+        ForegroundNotificationPresenter.open = nil
+
+        ForegroundNotificationPresenter.receive(.challenge(login: "ada"))
+        var opened: [DeepLink] = []
+        ForegroundNotificationPresenter.open = { opened.append($0) }
+        #expect(opened == [.challenge(login: "ada")])
+
+        // Delivered once; later responses go straight through.
+        ForegroundNotificationPresenter.receive(.board(window: nil))
+        #expect(opened == [.challenge(login: "ada"), .board(window: nil)])
+    }
+
     @Test func shareYourRaceOpensTheirViewAndAsksForTheChallenge() async {
         let (model, _) = makeModel()
         await model.sceneDidBecomeActive()
