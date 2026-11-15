@@ -16,6 +16,8 @@ import UIKit
 /// iPhone Duo) and `-ScreenshotPersonDay <n>` selects that day's bar instead of today's
 /// (`-ScreenshotPersonEnd` scrolls it to the end),
 /// `-ScreenshotTroll <login>` gives that person a trolling day (784 more, the troll face),
+/// `-ScreenshotRecordDay <n>` makes your count today n (a big one sets a record: the record card
+/// and New tiles in Your records), `-ScreenshotHide` takes several logins separated by commas,
 /// `-ScreenshotCountScale <n>` multiplies everyone's counts by n (30 puts every 30-day count in
 /// the thousands beside the streaks, the board's widest rows), and
 /// `-LiveRankPayload <file.json>` shows a Live Activity push payload's content state in Live rank,
@@ -192,9 +194,10 @@ enum ScreenshotFixture {
             includesFailingCompetitor: failingCompetitor,
             restrictedOrganizations: value(after: "-ScreenshotRestrictedOrg").map { [$0] },
             trollPerson: value(after: "-ScreenshotTroll"),
-            countScale: value(after: "-ScreenshotCountScale").flatMap(Int.init).map { max(1, $0) } ?? 1
+            countScale: value(after: "-ScreenshotCountScale").flatMap(Int.init).map { max(1, $0) } ?? 1,
+            recordDay: value(after: "-ScreenshotRecordDay").flatMap(Int.init)
         ), now: now)
-        let hide = value(after: "-ScreenshotHide")
+        let hide = value(after: "-ScreenshotHide")?.split(separator: ",").map(String.init)
         // `-ScreenshotWindow monthly`: the board opens on that Window (a raw value).
         if let window = value(after: "-ScreenshotWindow").flatMap(ContributionWindow.init(rawValue:)) {
             services.store.selectedWindow = window
@@ -203,7 +206,7 @@ enum ScreenshotFixture {
             await services.auth.refreshIdentity()
             if let hide {
                 await services.roster.refresh(force: true)
-                services.store.setHidden(true, username: hide)
+                for login in hide { services.store.setHidden(true, username: login) }
             }
             // Two refreshes on the same day: the first sets today's baseline, the second moves.
             await services.refresh.refreshAll(reason: .manual)
