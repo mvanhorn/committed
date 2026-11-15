@@ -1,11 +1,11 @@
 "use client";
 
 import type { ComponentProps } from "react";
-import { captureLink } from "@/lib/analytics";
+import { captureLink, type AnalyticsPlacement } from "@/lib/analytics";
 
 type Props = Omit<ComponentProps<"a">, "onClick" | "onAuxClick"> & {
   event: "download_clicked" | "github_clicked";
-  placement: "hero" | "header" | "footer" | "closing";
+  placement: AnalyticsPlacement;
 };
 
 export function AnalyticsLink({ event, placement, ...props }: Props) {

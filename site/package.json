@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "npx serve out",
+    "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test lib/download-platform.test.mjs app/sitemap.test.mjs"
+    "test": "node --experimental-strip-types --test lib/download-platform.test.mjs lib/challenge.test.mjs app/sitemap.test.mjs"
   },
   "dependencies": {
     "next": "16.4.2",

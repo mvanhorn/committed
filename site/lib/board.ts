@@ -6,6 +6,8 @@ export const DOWNLOAD_URL =
   "https://github.com/prompthunt/commit-standings-releases/releases/latest/download/Committed.dmg";
 export const WINDOWS_DOWNLOAD_URL =
   "https://github.com/prompthunt/commit-standings-releases/releases/latest/download/Committed-Setup.exe";
+/** Committed for iPhone on the App Store. */
+export const IPHONE_DOWNLOAD_URL = "https://apps.apple.com/app/id6831797452";
 export const RELEASES_URL =
   "https://github.com/prompthunt/commit-standings-releases/releases/latest";
 export const SOURCE_URL = "https://github.com/prompthunt/committed";

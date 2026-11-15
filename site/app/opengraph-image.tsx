@@ -1,7 +1,6 @@
 import { ImageResponse } from "next/og";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { GLYPH_PATH } from "@/lib/glyph";
+import { ogFonts } from "@/lib/og-fonts";
 
 export const dynamic = "force-static";
 export const alt = "Committed — A GitHub leaderboard for your Mac’s menu bar";
@@ -9,10 +8,6 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 export default async function OpengraphImage() {
-  const [regular, extraBold] = await Promise.all([
-    readFile(join(process.cwd(), "app/fonts/InterTight-Regular.ttf")),
-    readFile(join(process.cwd(), "app/fonts/InterTight-ExtraBold.ttf")),
-  ]);
   return new ImageResponse(
     (
       <div
@@ -40,12 +35,6 @@ export default async function OpengraphImage() {
         </div>
       </div>
     ),
-    {
-      ...size,
-      fonts: [
-        { name: "Inter Tight", data: regular, weight: 400, style: "normal" },
-        { name: "Inter Tight", data: extraBold, weight: 800, style: "normal" },
-      ],
-    },
+    { ...size, fonts: await ogFonts() },
   );
 }
