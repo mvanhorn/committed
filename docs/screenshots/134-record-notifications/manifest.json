@@ -1,0 +1,23 @@
+{
+  "device": "iPhone Duo Simulator (shared persistent Duo 94D56458-B90B-484A-BA5E-16748D2CBEE5), closed, portrait",
+  "os": "iOS 27.1",
+  "notes": "Runtime captures, not renders. Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -ScreenshotTab settings -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotNotifications. A record notification itself (relay push with the app closed) was not captured: the relay was not running.",
+  "screenshots": [
+    {
+      "file": "before-notifications.png",
+      "caption": "Before (spec/124-habit-loop with #130): the Notifications screen with About your rivals and Quiet hours only; copied from docs/screenshots/130-notifications-screen/notifications-default.png",
+      "capture": { "sourceCommit": "0e4f03043fb38ba716059798245643b00d87c940", "fixture": true }
+    },
+    {
+      "file": "notifications-records-on.png",
+      "caption": "After: About you with Records on (the default), between About your rivals and Quiet hours; the footer says records set during quiet hours wait until they end",
+      "capture": { "sourceCommit": "f8aa9aeca227ff534676fa6e0b85fa019c87ff24", "fixture": true }
+    },
+    {
+      "file": "notifications-records-off.png",
+      "caption": "After: Records off; the footer says what turning it on does",
+      "capture": { "sourceCommit": "f8aa9aeca227ff534676fa6e0b85fa019c87ff24", "fixture": true },
+      "notes": "Also launched with -ScreenshotRecords off."
+    }
+  ]
+}
