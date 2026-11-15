@@ -67,6 +67,21 @@ struct YourRivalsTests {
         #expect(YourRivals.gapLine(yours: nil, theirs: 5) == nil)
     }
 
+    /// VoiceOver reads a rival's row as one line, the gap after their count.
+    @Test func voiceOverReadsTheGapOnARivalsRow() {
+        let row = StandingRow(rank: 2, competitor: Competitor(username: "odile-m", isSelf: false),
+                              standing: Standing(username: "odile-m", contributions: 9, window: .daily,
+                                                 lastUpdated: .now, state: .loaded),
+                              window: .daily, streak: 400, caption: "2 to pass")
+        #expect(row.accessibilityDescription
+                == "rank 2, odile-m, 9 contributions for today, 2 to pass, 365-plus-day streak")
+        let level = StandingRow(rank: 4, competitor: Competitor(username: "bram-ott", isSelf: false),
+                                standing: Standing(username: "bram-ott", contributions: 7, window: .daily,
+                                                   lastUpdated: .now, state: .loaded),
+                                window: .daily, caption: "Level")
+        #expect(level.accessibilityDescription == "rank 4, bram-ott, 7 contributions for today, level")
+    }
+
     @Test func everyoneHeaderCountsThePeopleOnTheBoard() {
         #expect(YourRivals.everyoneHeader(count: 5) == "Everyone · 5 people")
         #expect(YourRivals.everyoneHeader(count: 1) == "Everyone · 1 person")
