@@ -9,6 +9,9 @@ import SwiftUI
 /// (`AppModel.relayNotificationsOn`) the choice is disabled, since the first switch on brings the
 /// defaults, this one included.
 struct DeliverySection: View {
+    /// The section's scroll identity on the Notifications screen.
+    static let id = "delivery"
+
     @Environment(AppModel.self) private var model
 
     var body: some View {

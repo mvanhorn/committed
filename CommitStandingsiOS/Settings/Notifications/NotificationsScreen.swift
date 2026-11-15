@@ -21,6 +21,20 @@ struct NotificationsScreen: View {
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
+        ScrollViewReader { proxy in
+            form
+            #if DEBUG
+            .task(id: model.showsRelayNotificationChoices) {
+                // The screenshot fixture's -ScreenshotNotificationsEnd: below-the-fold sections.
+                guard ScreenshotFixture.notificationsScrolledToEnd, model.showsRelayNotificationChoices else { return }
+                try? await Task.sleep(for: .milliseconds(800))
+                proxy.scrollTo(DeliverySection.id, anchor: .top)
+            }
+            #endif
+        }
+    }
+
+    private var form: some View {
         Form {
             Group {
                 NotificationPermissionSection()
@@ -29,6 +43,7 @@ struct NotificationsScreen: View {
                     ResultsSection()
                     AboutYouSection()
                     DeliverySection()
+                        .id(DeliverySection.id)
                     QuietHoursSection()
                 }
             }
@@ -36,9 +51,6 @@ struct NotificationsScreen: View {
             .listRowSeparatorTint(.hairline)
         }
         .listSectionSpacing(28)
-        #if DEBUG
-        .defaultScrollAnchor(ScreenshotFixture.notificationsScrolledToEnd ? .bottom : nil)
-        #endif
         .inkScreen()
         .readableContentWidth()
         .navigationTitle("Notifications")

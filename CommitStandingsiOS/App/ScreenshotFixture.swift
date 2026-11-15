@@ -29,7 +29,7 @@ import UIKit
 /// the thousands beside the streaks, the board's widest rows), and
 /// `-LiveRankPayload <file.json>` shows a Live Activity push payload's content state in Live rank,
 /// `-ScreenshotNotifications` opens Settings ▸ Notifications (with `-ScreenshotTab settings`;
-/// `-ScreenshotNotificationsEnd` opens it scrolled to its end),
+/// `-ScreenshotNotificationsEnd` scrolls it to Delivery),
 /// `-ScreenshotPasses rivals`, `-ScreenshotCloseCalls`, `-ScreenshotResults off`, `-ScreenshotRecords off`,
 /// `-ScreenshotStreakReminder`, `-ScreenshotDelivery immediate` and `-ScreenshotQuietHours 23:30-07:00`
 /// (or `off`) set the board owner's notification choices,
@@ -141,8 +141,8 @@ enum ScreenshotFixture {
         ProcessInfo.processInfo.arguments.contains("-ScreenshotNotifications")
     }
 
-    /// `-ScreenshotNotificationsEnd`: the Notifications screen opens scrolled to its end (Delivery
-    /// and Quiet hours), for captures of sections below the fold.
+    /// `-ScreenshotNotificationsEnd`: the Notifications screen scrolls to Delivery (and Quiet hours
+    /// below it) once it loads, for captures of sections below the fold.
     static var notificationsScrolledToEnd: Bool {
         ProcessInfo.processInfo.arguments.contains("-ScreenshotNotificationsEnd")
     }
