@@ -62,7 +62,8 @@ struct ChallengeCard: View {
     }
 }
 
-/// The headline, with the gap in lime: "I'm 12 ahead of you, ezra-q."
+/// The headline, with the gap in lime: "I'm 12 ahead of you, ezra-q." "Not for long." goes on
+/// its own line in lime, so it never breaks mid-phrase.
 private struct ChallengeHeadline: View {
     let challenge: Challenge
 
@@ -78,11 +79,12 @@ private struct ChallengeHeadline: View {
     }
 
     private var styled: Text {
-        let headline = challenge.headline
-        guard challenge.variant != .level, let range = headline.range(of: challenge.gapText) else {
-            return Text(headline)
+        let taunt = challenge.taunt.map { Text("\n\(Text($0).foregroundStyle(Color.lime))") } ?? Text(verbatim: "")
+        let lead = challenge.headlineLead
+        guard challenge.variant != .level, let range = lead.range(of: challenge.gapText) else {
+            return Text("\(Text(verbatim: lead))\(taunt)")
         }
-        return Text("\(String(headline[..<range.lowerBound]))\(Text(challenge.gapText).foregroundStyle(Color.lime))\(String(headline[range.upperBound...]))")
+        return Text("\(Text(verbatim: String(lead[..<range.lowerBound])))\(Text(verbatim: challenge.gapText).foregroundStyle(Color.lime))\(Text(verbatim: String(lead[range.upperBound...])))\(taunt)")
     }
 }
 
@@ -108,17 +110,20 @@ private struct ChallengeRaceCard: View {
         VStack(spacing: 12) {
             HStack(spacing: 14) {
                 AvatarView(username: login, size: 56)
+                // Both logins at one size: only a login too long for the row shrinks.
                 Text(login)
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
+                    .layoutPriority(1)
                 Spacer(minLength: 12)
                 Text(total.formatted(.number.locale(challenge.locale)))
                     .font(CommittedType.display(44, relativeTo: .largeTitle))
                     .displayTracking(44)
                     .foregroundStyle(leads ? Color.lime : .white)
                     .lineLimit(1)
+                    .fixedSize()
             }
             GeometryReader { proxy in
                 Capsule()

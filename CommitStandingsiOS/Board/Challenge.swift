@@ -45,11 +45,21 @@ struct Challenge: Equatable, Sendable {
 
     /// The story's headline.
     var headline: String {
+        [headlineLead, taunt].compactMap { $0 }.joined(separator: " ")
+    }
+
+    /// The headline up to the taunt: "You're 12 ahead of me, ezra-q."
+    var headlineLead: String {
         switch variant {
         case .ahead: "I’m \(gapText) ahead of you, \(friend)."
-        case .behind: "You’re \(gapText) ahead of me, \(friend). Not for long."
+        case .behind: "You’re \(gapText) ahead of me, \(friend)."
         case .level: "Dead level, \(friend)."
         }
+    }
+
+    /// "Not for long.", when they're ahead.
+    var taunt: String? {
+        variant == .behind ? "Not for long." : nil
     }
 
     /// The message beside the image, with the link: "ezra-q, I'm 12 ahead of you on Committed: …".
