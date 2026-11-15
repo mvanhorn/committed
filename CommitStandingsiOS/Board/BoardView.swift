@@ -154,7 +154,7 @@ struct BoardLeaderboard: View {
         let board = RankedBoard(store)
         let window = board.window
         let entries = board.entries
-        let rivals = YourRivals.rows(ranked: entries, store: store)
+        let rivals = model.yourRivals(ranked: entries)
 
         List {
             // A record you set today, first thing on the Board, under the Window switch's bar.
@@ -257,7 +257,7 @@ private struct YourRivalsSection: View {
             // people's rows in the list below.
             ForEach(rows, id: \.entry.competitor.username) { row in
                 PersonRowButton(login: row.entry.competitor.username) {
-                    board.row(row.entry, store: store, refresh: refresh, caption: row.gap)
+                    board.row(row.entry, store: store, refresh: refresh, caption: row.gap, record: row.record)
                 }
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
@@ -402,9 +402,10 @@ private struct RankedBoard {
     }
 
     /// The shared row for `entry`, with today's movement on Today, and the person's streak.
-    /// `caption` is a line under the name: Your rivals' gap.
+    /// `caption` is a line under the name: Your rivals' gap. `record`, Your rivals' weekly record
+    /// against them, takes the streak's place.
     func row(_ entry: Ranking.Entry, store: StandingsStore, refresh: RefreshCoordinator,
-             caption: String? = nil) -> StandingRow {
+             caption: String? = nil, record: RivalryRecord? = nil) -> StandingRow {
         StandingRow(
             rank: entry.rank,
             competitor: entry.competitor,
@@ -413,7 +414,9 @@ private struct RankedBoard {
             maxContributions: maxContributions,
             rankDelta: refresh.rankDelta(for: entry.competitor.username, in: window),
             streak: refresh.streak(for: entry.competitor.username),
-            caption: caption
+            caption: caption,
+            record: record?.text,
+            recordSpoken: record?.spoken(against: entry.competitor.username)
         )
     }
 }

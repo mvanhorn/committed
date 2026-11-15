@@ -476,6 +476,12 @@ final class AppModel {
         selectedPerson.flatMap { store.person($0, asOf: now(), calendar: .current) }
     }
 
+    /// Your rivals on the Board, from `ranked` (the selected Window's board), with your weekly
+    /// records as of the app's clock, the same date the person view uses.
+    func yourRivals(ranked: [Ranking.Entry]) -> [YourRivals.Row] {
+        YourRivals.rows(ranked: ranked, store: store, asOf: now())
+    }
+
     // MARK: - Your records
 
     /// Your records as of now, against the people on the board: nil until your calendar loads.
