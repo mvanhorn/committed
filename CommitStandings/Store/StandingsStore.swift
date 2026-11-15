@@ -46,6 +46,9 @@ final class StandingsStore {
     private let historyPersistence: any ContributionHistoryPersistence
     private let hiddenPeoplePersistence: any HiddenPeoplePersistence
     private var hiddenByAccount: [String: Set<String>]
+    private let pinnedRivalsPersistence: any PinnedRivalsPersistence
+    /// Each account's pinned rivals, in pin order. Never more than `maxPinnedRivals` per account.
+    private var pinnedByAccount: [String: [String]]
 
     init(
         persistence: CompetitorPersistence = UserDefaultsCompetitorPersistence(),
@@ -53,13 +56,16 @@ final class StandingsStore {
         // defaults to in-memory so test suites and previews stay isolated.
         snapshotPersistence: StandingsSnapshotPersistence = InMemoryStandingsSnapshotPersistence(),
         hiddenPeoplePersistence: any HiddenPeoplePersistence = InMemoryHiddenPeoplePersistence(),
-        historyPersistence: any ContributionHistoryPersistence = InMemoryContributionHistoryPersistence()
+        historyPersistence: any ContributionHistoryPersistence = InMemoryContributionHistoryPersistence(),
+        pinnedRivalsPersistence: any PinnedRivalsPersistence = InMemoryPinnedRivalsPersistence()
     ) {
         self.persistence = persistence
         self.snapshotPersistence = snapshotPersistence
         self.historyPersistence = historyPersistence
         self.hiddenPeoplePersistence = hiddenPeoplePersistence
         self.hiddenByAccount = hiddenPeoplePersistence.load()
+        self.pinnedRivalsPersistence = pinnedRivalsPersistence
+        self.pinnedByAccount = pinnedRivalsPersistence.load()
         self.competitors = persistence.load()
         // Restore the last loaded standings so the board renders immediately. State is
         // forced to `.loaded` (we're not mid-fetch at launch); stale entries for people
@@ -116,11 +122,70 @@ final class StandingsStore {
               competitors.contains(where: { $0.username == username }), isHidden(username) != hidden else { return }
         if hidden {
             hiddenByAccount[owner, default: []].insert(username)
+            // A hidden person never shows in Your rivals, so hiding unpins them.
+            unpin(username, owner: owner)
         } else {
             hiddenByAccount[owner]?.remove(username)
         }
         visibilityRevision += 1
         hiddenPeoplePersistence.save(hiddenByAccount)
+    }
+
+    // MARK: - Pinned rivals
+
+    /// How many rivals one account can pin.
+    static let maxPinnedRivals = 3
+
+    /// Whether `rawUsername` is one of this account's pinned rivals, on the board or not.
+    func isPinned(_ rawUsername: String) -> Bool {
+        guard let owner = selfCompetitor?.username,
+              let username = UsernameNormalization.normalize(rawUsername) else { return false }
+        return pinnedByAccount[owner]?.contains(username) == true
+    }
+
+    /// This account's pinned rivals on the board now, in the order they were pinned. Someone who
+    /// left the board stays pinned and is back here when they return.
+    var pinnedRivals: [Competitor] {
+        guard let owner = selfCompetitor?.username, let pinned = pinnedByAccount[owner] else { return [] }
+        let visible = Dictionary(visibleCompetitors.map { ($0.username, $0) }, uniquingKeysWith: { first, _ in first })
+        return pinned.compactMap { visible[$0] }
+    }
+
+    /// False once three rivals on the board are pinned: Rival then explains the limit.
+    var canPinAnotherRival: Bool {
+        pinnedRivals.count < Self.maxPinnedRivals
+    }
+
+    /// Pins or unpins someone on the board for this GitHub account, saved locally like visibility.
+    /// Returns false when nothing changed: yourself, someone not on the board (or hidden), or a
+    /// fourth pin. Someone who left the board can't be unpinned from their view, so they never
+    /// hold a place: a pin that needs one forgets the earliest of them.
+    @discardableResult
+    func setPinned(_ pinned: Bool, username rawUsername: String) -> Bool {
+        guard let owner = selfCompetitor?.username,
+              let username = UsernameNormalization.normalize(rawUsername), username != owner,
+              isPinned(username) != pinned else { return false }
+        if !pinned {
+            unpin(username, owner: owner)
+            return true
+        }
+        guard visibleCompetitors.contains(where: { $0.username == username }), canPinAnotherRival else { return false }
+        var list = pinnedByAccount[owner] ?? []
+        let onBoard = Set(competitors.map(\.username))
+        while list.count >= Self.maxPinnedRivals, let gone = list.firstIndex(where: { !onBoard.contains($0) }) {
+            list.remove(at: gone)
+        }
+        list.append(username)
+        pinnedByAccount[owner] = list
+        pinnedRivalsPersistence.save(pinnedByAccount)
+        return true
+    }
+
+    private func unpin(_ username: String, owner: String) {
+        guard var list = pinnedByAccount[owner], let index = list.firstIndex(of: username) else { return }
+        list.remove(at: index)
+        pinnedByAccount[owner] = list.isEmpty ? nil : list
+        pinnedRivalsPersistence.save(pinnedByAccount)
     }
 
     /// Reconcile the automatic roster, retaining row identities and cached counts for people
