@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { challengeView } from "@/lib/challenge";
+import { challengeView, segment } from "@/lib/challenge";
 import { loadRace } from "@/lib/challenge-race";
 import { GLYPH_PATH } from "@/lib/glyph";
 import { ogFonts } from "@/lib/og-fonts";
@@ -27,7 +27,7 @@ const FIELD = (() => {
 /** The link preview: the score, the challenger's words to the friend, and the square field. */
 export default async function ChallengeImage({ params }: { params: Promise<{ challenger: string; friend: string }> }) {
   const { challenger, friend } = await params;
-  const segments = [decodeURIComponent(challenger), decodeURIComponent(friend)] as const;
+  const segments = [segment(challenger), segment(friend)] as const;
   const view = challengeView(...segments, await loadRace(...segments), Math.floor(Date.now() / 1000));
   const words = view.ok ? view.story : view.title;
 

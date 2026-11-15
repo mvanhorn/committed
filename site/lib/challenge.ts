@@ -62,6 +62,15 @@ export type ChallengeView =
 // GitHub logins: alphanumerics and single hyphens, 1–39 chars, as the relay normalizes them.
 const LOGIN_PATTERN = /^[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){0,38}$/;
 
+/** A URL path segment, percent-decoded; a malformed escape is kept as typed rather than thrown. */
+export function segment(raw: string): string {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
 /** The login GitHub and the relay would read from a URL segment, or null. */
 export function normalizeLogin(raw: string): string | null {
   let login = raw.trim();

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { challengeView, RACE_ERROR } from "./challenge.ts";
+import { challengeView, RACE_ERROR, segment } from "./challenge.ts";
 
 // 2026-11-15 12:00 UTC.
 const NOW = 1_794_744_000;
@@ -136,4 +136,11 @@ test("the chart marks the day the lead last changed", () => {
   const passed = race({ addisonk: 412, ezra: 400, latestLeadChange: { date: "2026-11-09", login: "addisonk", kind: "passed" }, leadChanges: 1 });
   assert.equal(challengeView("addisonk", "ezra-q", passed, NOW).markDay, 23);
   assert.equal(challengeView("addisonk", "ezra-q", race({ addisonk: 412, ezra: 400 }), NOW).markDay, null);
+});
+
+test("a URL segment decodes, and a malformed one never throws", () => {
+  assert.equal(segment("%40ezra-q"), "@ezra-q");
+  assert.equal(segment("%"), "%");
+  assert.equal(segment("%E0%A4%A"), "%E0%A4%A");
+  assert.equal(challengeView(segment("%"), "ezra-q", null, NOW).ok, false);
 });

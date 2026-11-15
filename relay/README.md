@@ -154,7 +154,7 @@ people's race over the Board's 30 days Window, computed on request through the s
 - `Access-Control-Allow-Origin: *`, `Cache-Control: public, max-age=60` on success.
 - Rate limited per `cf-connecting-ip` by `BOARD_LIMITER` (20 a minute), counted apart from
   `/v1/board`; past that, `429`. The site reads it from Vercel's servers, which share their
-  outbound IPs, so the site caches each pair's page and image for a minute.
+  outbound IPs, so the site reuses each pair's read for a minute; a failed read isn't reused.
 
 ### Limits
 

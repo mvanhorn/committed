@@ -3,7 +3,7 @@ import { ChallengeDownloads } from "@/components/ChallengeDownloads";
 import { RaceCard } from "@/components/RaceCard";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { SquareField } from "@/components/SquareField";
-import { challengeView } from "@/lib/challenge";
+import { challengeView, segment } from "@/lib/challenge";
 import { loadRace } from "@/lib/challenge-race";
 
 type Props = { params: Promise<{ challenger: string; friend: string }> };
@@ -12,7 +12,7 @@ const nowSeconds = () => Math.floor(Date.now() / 1000);
 
 async function viewFor(params: Props["params"]) {
   const { challenger, friend } = await params;
-  const segments = [decodeURIComponent(challenger), decodeURIComponent(friend)] as const;
+  const segments = [segment(challenger), segment(friend)] as const;
   return { segments, view: challengeView(...segments, await loadRace(...segments), nowSeconds()) };
 }
 
