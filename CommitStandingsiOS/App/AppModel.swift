@@ -483,7 +483,7 @@ final class AppModel {
             await updateNotificationChoices { $0.passes = .off }
             return
         }
-        services.notifications.setEnabled(false)
+        await services.notifications.setEnabled(false)
         forgetNotificationSwitchRequest()
         notificationChoicesRevision += 1
         await syncRelayNotifications()

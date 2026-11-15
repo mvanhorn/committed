@@ -407,7 +407,7 @@ struct RelayNotificationsTests {
         await model.sceneDidBecomeActive()
         await model.backgroundRefresh()
 
-        #expect(!relay.notifications.contains(.some(nil)))
+        #expect(!relay.notifications.contains { $0 == nil })
         #expect(lastNotifications == .some(RelayNotificationsConfiguration(preferences: saved)))
     }
 
