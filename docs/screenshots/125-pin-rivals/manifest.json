@@ -1,16 +1,8 @@
 {
   "device": "iPhone Duo Simulator (closed, outer display, portrait)",
   "os": "iOS 27.1",
-  "notes": "Ticket #125 (spec #124). Runtime captures of the Debug app on the shared iPhone Duo (94D56458-…) with the screenshot fixture (Sample board data): -ScreenshotFixture -ScreenshotDate 2026-11-15T19:00:00Z, plus -ScreenshotPin / -ScreenshotPerson / -ScreenshotWindow / -ScreenshotRivalLimit per capture. Mac unchanged: CommitStandingsTests/StandingRowRenderTests (RENDER_DIR) rendered byte-identical PNGs, dark and light, on origin/spec/124-habit-loop (43044bd) and on this commit. Not captured: the open iPhone Duo's second pane (PersonPane with Rival beside GitHub); the Duo can't be opened headlessly here.",
+  "notes": "Ticket #125 (spec #124). Runtime captures of the Debug app on the shared iPhone Duo (94D56458-…) with the screenshot fixture (Sample board data): -ScreenshotFixture -ScreenshotDate 2026-11-15T19:00:00Z, plus -ScreenshotPin / -ScreenshotPerson / -ScreenshotWindow / -ScreenshotRivalLimit per capture. Mac unchanged: CommitStandingsTests/StandingRowRenderTests (RENDER_DIR) rendered byte-identical PNGs, dark and light, on origin/spec/124-habit-loop (43044bd) and on this commit. Baseline missing: no capture was taken from the base commit; with no pins the Board draws the same as before (no Your rivals section, its usual \"6 people · Today\" header), but that state isn't in this set (its capture showed Connect GitHub because the first launch after install didn't open the fixture board, so it was dropped). Every Rival state was reached through launch flags, not taps. Not captured: the open iPhone Duo's second pane (PersonPane with Rival beside GitHub); the Duo can't be opened headlessly here.",
   "screenshots": [
-    {
-      "file": "board-no-rivals.png",
-      "caption": "Board, Today, no pinned rivals: unchanged from before #125 (no Your rivals section, header \"6 people · Today\")",
-      "capture": {
-        "sourceCommit": "41929007b15fadb914ae670d829c168d21000f3e",
-        "fixture": true
-      }
-    },
     {
       "file": "board-your-rivals.png",
       "caption": "Board, Today, odile-m and ezra-q pinned: Your rivals between your summary and the list, rows with rank and the gap (\"2 to pass\", \"1 ahead\"), list headed \"Everyone · 6 people\"",
