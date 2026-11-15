@@ -409,6 +409,30 @@ struct RelayNotificationsTests {
         #expect(model.selectedPerson == "ada")
         #expect(model.requestedChallenge == "ada")
     }
+
+    // MARK: Close calls (#132)
+
+    @Test func aTappedCloseCallOpensThatPersonsView() async {
+        let (model, _) = makeModel()
+        await model.sceneDidBecomeActive()
+        model.selectedTab = .settings
+
+        // The relay's close-call payload: no category, so a body tap is the only response.
+        let closeCall: [AnyHashable: Any] = ["kind": "closeCall", "login": "Ada", "aps": ["thread-id": "closeCalls"]]
+        let link = DeepLink(notification: closeCall, action: "com.apple.UNNotificationDefaultActionIdentifier")
+        #expect(link == .person(login: "ada"))
+        model.open(link!)
+
+        #expect(model.selectedTab == .board)
+        #expect(model.selectedPerson == "ada")
+    }
+
+    @Test func aCloseCallWithoutALoginOrDismissedGoesNowhere() {
+        #expect(DeepLink(notification: ["kind": "closeCall"]) == nil)
+        let closeCall: [AnyHashable: Any] = ["kind": "closeCall", "login": "ada"]
+        #expect(DeepLink(notification: closeCall, action: "com.apple.UNNotificationDismissActionIdentifier") == nil)
+        #expect(DeepLink(notification: closeCall, action: "SHARE_RACE") == nil)
+    }
 }
 
 /// What the app would have posted as local crossing notifications.
