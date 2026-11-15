@@ -45,8 +45,9 @@ async function register(notifications: Record<string, unknown> = {}) {
         apnsEnvironment: "production",
         liveRank: false,
         alertToken: ALERT,
-        // Passes and results (#131) off, so only records are sent.
-        notifications: { passes: "off", results: false, ...notifications },
+        // Passes and results (#131) off, so only records are sent; right away, not in the evening
+        // summary (#135).
+        notifications: { passes: "off", results: false, delivery: "immediate", ...notifications },
       }),
     }),
   );

@@ -5,6 +5,7 @@ import { sendAlert } from "./alerts";
 import type { NotificationContext, NotificationDeps } from "./index";
 import { isQuietHours } from "./quietHours";
 import type { CloseCallsState, NotificationState } from "./state";
+import { holdCloseCalls, holdsForSummary } from "./summary";
 
 /**
  * Close calls (#132): you're a few contributions behind someone directly above you, in the
@@ -96,15 +97,17 @@ export async function notifyCloseCalls(
   if (calls.length === 0) return state;
 
   const closeCalls: CloseCallsState = { date: today, sent: [...alreadySent, ...calls.map((call) => call.rival)] };
-  const next = { ...state, closeCalls };
+  // In summary delivery the evening summary (#135) holds them; otherwise they go now.
+  const summary = holdsForSummary(preferences);
+  const next = summary ? holdCloseCalls({ ...state, closeCalls }, calls, today) : { ...state, closeCalls };
   await save(next);
-  await sendCloseCallsNow(context, calls, deps);
+  if (!summary) await sendCloseCallsNow(context, calls, deps);
   return next;
 }
 
 /**
- * Sends close calls right away (delivery "immediate"). In summary delivery (#135) they're held
- * for the evening summary instead of coming through here.
+ * Sends close calls right away (delivery "immediate"). In summary delivery they're held for the
+ * evening summary (#135, summary.ts) instead of coming through here.
  */
 export async function sendCloseCallsNow(
   context: NotificationContext,

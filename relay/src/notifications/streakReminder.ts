@@ -6,6 +6,7 @@ import type { NotificationContext, NotificationDeps } from "./index";
 import type { NotificationPreferences } from "./preferences";
 import { isQuietHours, localMinutes } from "./quietHours";
 import type { NotificationState } from "./state";
+import { holdStreakReminder, holdsForSummary } from "./summary";
 
 /**
  * The streak reminder (#133, spec #124): "Your 40-day streak" / "Nothing yet today. It keeps going
@@ -88,10 +89,11 @@ export async function notifyStreakReminder(
   const reminder = streakReminderDue(context, state);
   if (!reminder) return state;
   const streak: StreakReminderState = { date: reminder.date };
-  const next = { ...state, streak };
+  // In summary delivery the evening summary (#135) holds it; otherwise it goes now.
+  const summary = holdsForSummary(context.preferences);
+  const next = summary ? holdStreakReminder({ ...state, streak }, reminder) : { ...state, streak };
   await save(next);
-  // Immediate delivery. The evening summary (#135) diverts this step for delivery "summary".
-  await sendStreakReminder(context.row, reminder, deps);
+  if (!summary) await sendStreakReminder(context.row, reminder, deps);
   return next;
 }
 

@@ -5,6 +5,7 @@ import { sendAlert } from "./alerts";
 import type { NotificationContext, NotificationDeps } from "./index";
 import { isQuietHours } from "./quietHours";
 import type { NotificationState } from "./state";
+import { holdRecords, holdsForSummary } from "./summary";
 
 /**
  * Records (#134): a TypeScript port of the best day, best week and longest streak in
@@ -197,8 +198,8 @@ const SENT_KEPT = 12;
  * minimum. Records due during quiet hours wait until they end, then go out with the day's latest
  * number. With Records off, nothing is found and anything held is dropped.
  *
- * Finding them (here) and sending them (`sendRecordsNow`) are separate steps, so the evening
- * summary (#135) can take the due records instead of sending them right away.
+ * Finding them (here) and sending them (`sendRecordsNow`) are separate steps: in summary delivery
+ * the evening summary (#135) takes the due records instead of sending them right away.
  */
 export async function notifyRecords(
   context: NotificationContext,
@@ -222,15 +223,17 @@ export async function notifyRecords(
       sent.push(broken.id);
       held.push({ id: broken.id, kind: broken.kind, day: today, value: broken.value, oldBest: broken.oldBest });
     }
-    records = { sent: sent.slice(-SENT_KEPT), held: mine ? held.map((record) => latest(record, mine, today)) : held };
+    records = { sent: sent.slice(-SENT_KEPT), held: mine ? held.map((record) => latestRecord(record, mine, today)) : held };
   }
 
   const due = records.held.length > 0 && !isQuietHours(now, row.time_zone, preferences.quietHours) ? records.held : [];
   if (due.length > 0) records = { ...records, held: [] };
 
-  const next = { ...state, records };
-  if (JSON.stringify(next.records) !== JSON.stringify(state.records ?? { sent: [], held: [] })) await save(next);
-  await sendRecordsNow(row, due, today, deps);
+  // In summary delivery (#135), due records wait for the evening summary instead.
+  const summary = due.length > 0 && holdsForSummary(preferences);
+  const next = summary ? holdRecords({ ...state, records }, due) : { ...state, records };
+  if (summary || JSON.stringify(next.records) !== JSON.stringify(state.records ?? { sent: [], held: [] })) await save(next);
+  if (!summary) await sendRecordsNow(row, due, today, deps);
   return next;
 }
 
@@ -286,7 +289,7 @@ export function recordCopy(record: DueRecord, today: string): { title: string; b
 }
 
 /** A held record's number brought up to date: its day's count, or its week's total through today. */
-function latest(record: DueRecord, days: Days, today: string): DueRecord {
+export function latestRecord(record: DueRecord, days: Days, today: string): DueRecord {
   let value = record.value;
   if (record.kind === "bestDay") value = Math.max(value, days[record.day] ?? 0);
   if (record.kind === "bestWeek") {

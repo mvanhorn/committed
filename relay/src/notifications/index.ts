@@ -9,6 +9,7 @@ import { parsePreferences, type NotificationPreferences } from "./preferences";
 import { notifyResults } from "./results";
 import { parseState, type NotificationState } from "./state";
 import { notifyStreakReminder } from "./streakReminder";
+import { notifySummary } from "./summary";
 
 /**
  * Relay notifications (spec #124): what the cron cycle sends each installation that has
@@ -50,6 +51,8 @@ export async function runNotifications(
   state = await notifyRecords(context, state, (next) => saveState(row, next, deps), deps);
   state = await notifyStreakReminder(context, state, (next) => saveState(row, next, deps), deps);
   state = await notifyResults(context, state, (next) => saveState(row, next, deps), deps);
+  // Last, so anything held in this cycle can go out in it.
+  state = await notifySummary(context, state, (next) => saveState(row, next, deps), deps);
 }
 
 /** State is saved before anything is sent, so a failure mid-send can't send the same thing twice. */
