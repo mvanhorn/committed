@@ -117,6 +117,45 @@ shared 5-minute `contribution_cache`. Nothing else is stored.
 - `Access-Control-Allow-Origin: *`, `Cache-Control: public, max-age=60`.
 - Rate limited per `cf-connecting-ip` by the `BOARD_LIMITER` binding (20 a minute); past that, `429`.
 
+### `GET /v1/race?login=&rival=&tz=`
+
+Public and unauthenticated, for the challenge page (`gitcommitted.app/vs/<login>/<rival>`). Two
+people's race over the Board's 30 days Window, computed on request through the same shared
+5-minute `contribution_cache`, so it costs at most two GitHub fetches. Nothing else is stored.
+
+- `login` (the challenger) and `rival` are normalized like a registration and must differ; `tz` is
+  an IANA time zone (default `UTC`) that sets which 30 days are raced.
+- Returns:
+
+  ```json
+  {
+    "login": "addisonk",
+    "rival": "ezra-q",
+    "dates": ["2026-10-17", "…", "2026-11-15"],
+    "days": { "addisonk": [3, 0, "…"], "ezra-q": [1, 4, "…"] },
+    "totals": { "addisonk": 412, "ezra-q": 400 },
+    "latestLeadChange": { "date": "2026-11-09", "login": "addisonk", "kind": "passed" },
+    "leadChanges": 3,
+    "updatedAt": 1794790000
+  }
+  ```
+
+  - `dates` are the 30 raced days, oldest first, ending today in `tz`; `days` gives each login's
+    count for each of them, and `totals` their sums (the Board's 30 days totals).
+  - The lead follows the app's race story (`PersonSummary.Story`) over the two running totals: a
+    level day keeps whoever led before it, so only a strict lead counts. `latestLeadChange.kind` is
+    `pulledAhead` (the first lead, taken from level), `passed` (the lead changed hands; `leadChanges`
+    counts how often) or `caught` (level now; `date` is the first day of that level run). It's
+    `null` when one person has led since the first day, or when they've never been apart.
+  - `updatedAt` is the older of the two counts' fetch times, in Unix seconds.
+- Errors use the usual `{ "error": code }`: `400` with `invalid_login`, `invalid_rival` (missing,
+  malformed, or the same as `login`) or `invalid_time_zone`; `404` `unknown_login` when either
+  calendar can't be read and nothing is cached, which isn't cached publicly.
+- `Access-Control-Allow-Origin: *`, `Cache-Control: public, max-age=60` on success.
+- Rate limited per `cf-connecting-ip` by `BOARD_LIMITER` (20 a minute), counted apart from
+  `/v1/board`; past that, `429`. The site reads it from Vercel's servers, which share their
+  outbound IPs, so the site reuses each pair's read for a minute; a failed read isn't reused.
+
 ### Limits
 
 - **Writes:** 30 per installation per 10 minutes; past that, `429`.
