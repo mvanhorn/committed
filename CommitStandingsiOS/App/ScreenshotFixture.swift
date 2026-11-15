@@ -19,6 +19,8 @@ import UIKit
 /// iPhone Duo) and `-ScreenshotPersonDay <n>` selects that day's bar instead of today's
 /// (`-ScreenshotPersonEnd` scrolls it to the end),
 /// `-ScreenshotTroll <login>` gives that person a trolling day (784 more, the troll face),
+/// `-ScreenshotCalendarFrom <login>=<YYYY-MM-DD>` starts that person's calendar on that day once the
+/// board loads (empty weeks in their Weekly record),
 /// `-ScreenshotRecordDay <n>` makes your count today n (a big one sets a record: the record card
 /// and New tiles in Your records; `-ScreenshotShareRecord` then taps the card's Share), `-ScreenshotHide` takes several logins separated by commas,
 /// `-ScreenshotCountScale <n>` multiplies everyone's counts by n (30 puts every 30-day count in
