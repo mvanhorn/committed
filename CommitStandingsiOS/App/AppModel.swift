@@ -44,8 +44,10 @@ final class AppModel {
     }
     /// The switch in Settings asked for the relay disclosure.
     private var liveRankDisclosureRequested = false
-    /// The Passes switch asked for the relay notifications sheet.
+    /// A notification switch asked for the relay notifications sheet.
     private var relayNotificationsConsentRequested = false
+    /// The switch turned on that's waiting for **Turn On** in that sheet.
+    private var pendingNotificationSwitch: PendingNotificationSwitch?
 
     /// The graph on screen: the real one, or the Sample board's.
     private(set) var services: CommittedServices
@@ -143,9 +145,10 @@ final class AppModel {
         self.services = services
         self.liveRank = realLiveRank
         wire(services, liveRank: realLiveRank, avatars: avatars)
-        // One source at a time: while the relay delivers passes, the app posts none of its own.
-        services.notifications.isDeliveredByRelay = { [weak realLiveRank] in
-            realLiveRank?.relayDeliversNotifications ?? false
+        // One source at a time: while the relay delivers notifications, the app posts no passes of
+        // its own, and none while relay notifications are on with Passes off.
+        services.notifications.isDeliveredByRelay = { [weak self, weak realLiveRank] in
+            (realLiveRank?.relayDeliversNotifications ?? false) || (self?.passesOffForTheRelay ?? false)
         }
         // A successful Connect GitHub replaces the Sample board before the real board's first
         // refresh, so that refresh and its Live rank run on screen, as after any Connect GitHub.
@@ -206,7 +209,7 @@ final class AppModel {
         }
         services.onDisconnect = { [weak self, weak services] in
             liveRank.disconnected()
-            if let self, let services, self.services === services { self.relayNotificationsConsentRequested = false }
+            if let self, let services, self.services === services { self.forgetNotificationSwitchRequest() }
             if let self, let services, self.services === services { self.publishWidgets() }
         }
     }
@@ -274,7 +277,7 @@ final class AppModel {
         liveRank = realLiveRank
         didRefreshIdentity = false
         liveRankDisclosureRequested = false
-        relayNotificationsConsentRequested = false
+        forgetNotificationSwitchRequest()
         sampleBoardConnectError = nil
         selectedTab = .board
         realServices.refresh.resumeTimer()
@@ -389,15 +392,20 @@ final class AppModel {
 
     func acceptLiveRankDisclosure() async {
         liveRankDisclosureRequested = false
+        let pending = takeNotificationSwitchRequest()
         await liveRank.acceptRelayDisclosure()
-        // The sheet also agreed to relay notifications: with Passes on, they
-        // start now.
-        await syncRelayNotifications()
+        // The sheet also agreed to relay notifications: with a switch on, they start now.
+        if let pending {
+            await commit(pending)
+        } else {
+            await syncRelayNotifications()
+        }
         await refreshLiveRankIfStale()
     }
 
     func declineLiveRankDisclosure() async {
         liveRankDisclosureRequested = false
+        forgetNotificationSwitchRequest()
         await liveRank.declineRelayDisclosure()
     }
 
@@ -414,68 +422,195 @@ final class AppModel {
 
     // MARK: - Relay notifications
 
-    /// Relay notifications are on: a connected real board in a relay build, Passes on (the
-    /// Notifications screen's first switch), and agreed to in a relay sheet. Otherwise the app's own (in-app) crossing
-    /// notifications carry on as before; the Sample board never uses the relay.
+    /// Relay notifications are on (the "any switch" gate): a connected real board in a relay build,
+    /// agreed to in a relay sheet, notifications turned on with iOS's permission, and at least one
+    /// kind on (Passes, or any other switch on the Notifications screen). With Passes off the relay
+    /// hears `passes: "off"`; only with every kind off does it hear notifications off. Otherwise the
+    /// app's own (in-app) crossing notifications carry on as before; the Sample board never uses
+    /// the relay.
     var relayNotificationsOn: Bool {
+        relayNotificationsAllowed && savedNotificationChoices.anyKindOn
+    }
+
+    /// Everything relay notifications need but a kind turned on.
+    private var relayNotificationsAllowed: Bool {
         mode == .connected && liveRank.isRelayConfigured && liveRank.relayNotificationsChoice == true
-            && services.notifications.isEnabled
+            && notificationsTurnedOn
+    }
+
+    /// A notification switch has been turned on with iOS's permission granted: the flag that was
+    /// Leaderboard Notifications. In a relay build it stays on while Passes is off, and the
+    /// Notifications screen's switches read off until it's on. (It isn't observable on its own;
+    /// every change here bumps `notificationChoicesRevision`.)
+    private var notificationsTurnedOn: Bool {
+        _ = notificationChoicesRevision
+        return services.notifications.isEnabled
+    }
+
+    /// The real board's relay choices have Passes off: the app posts no passes of its own either.
+    private var passesOffForTheRelay: Bool {
+        services === realServices && showsRelayNotificationChoices && savedNotificationChoices.passes == .off
     }
 
     /// "Get notifications with Committed closed?": shown once, unasked, the first time relay
     /// notifications would turn on for someone who hasn't agreed to them (for example after
-    /// accepting the earlier relay sheet), and whenever the switch is turned on after **Not Now**.
-    /// Never over the relay sheet, which covers notifications itself.
+    /// accepting the earlier relay sheet), and whenever a switch is turned on before agreeing (and
+    /// after **Not Now**). Never over the relay sheet, which covers notifications itself.
     var isShowingRelayNotificationsConsent: Bool {
         get {
             guard mode == .connected, !needsConnect, liveRank.isRelayConfigured, !isShowingLiveRankDisclosure,
                   liveRank.relayNotificationsChoice != true else { return false }
             if relayNotificationsConsentRequested { return true }
-            return liveRank.relayNotificationsChoice == nil && services.notifications.isEnabled
+            return liveRank.relayNotificationsChoice == nil && notificationsTurnedOn && savedNotificationChoices.anyKindOn
         }
         set {
-            if !newValue { relayNotificationsConsentRequested = false }
+            if !newValue { forgetNotificationSwitchRequest() }
         }
     }
 
-    /// The Passes switch (formerly Leaderboard Notifications). On asks iOS for permission (and switches back off if
-    /// it's denied); in a relay build it then asks about relay notifications unless already agreed.
+    /// The Passes switch (formerly Leaderboard Notifications). On, it takes the shared step every
+    /// switch takes (`setNotificationChoice`). Off, with the relay's choices, it sends
+    /// `passes: "off"` and leaves the other kinds on; without them it turns the in-app
+    /// notifications off, as it always has.
     func leaderboardNotificationsChanged(_ enabled: Bool) async {
-        let granted = await services.notifications.setEnabled(enabled)
-        if granted, mode == .connected, liveRank.isRelayConfigured, liveRank.relayNotificationsChoice != true {
-            relayNotificationsConsentRequested = true
+        if enabled {
+            await notificationSwitchTurnedOn(isPasses: true) { choices in
+                if choices.passes == .off { choices.passes = .everyone }
+            }
+            return
         }
-        if !enabled { relayNotificationsConsentRequested = false }
+        if showsRelayNotificationChoices && notificationsTurnedOn {
+            await updateNotificationChoices { $0.passes = .off }
+            return
+        }
+        await services.notifications.setEnabled(false)
+        forgetNotificationSwitchRequest()
+        notificationChoicesRevision += 1
         await syncRelayNotifications()
     }
 
-    /// **Turn On**: relay notifications start; Live rank stays as it is.
-    func acceptRelayNotifications() async {
-        relayNotificationsConsentRequested = false
-        liveRank.setRelayNotificationsChoice(true)
+    /// The Passes switch as the Notifications screen shows it.
+    var passesOn: Bool {
+        guard notificationsTurnedOn else { return false }
+        return !showsRelayNotificationChoices || savedNotificationChoices.passes != .off
+    }
+
+    /// Settings' Notifications row: On while any notification is.
+    var notificationsOn: Bool {
+        guard notificationsTurnedOn else { return false }
+        return !showsRelayNotificationChoices || savedNotificationChoices.anyKindOn
+    }
+
+    /// A switch turned on, waiting for the relay notifications sheet.
+    private struct PendingNotificationSwitch {
+        /// Notifications weren't on yet: the choices become the defaults, with this switch on.
+        var isFirst: Bool
+        var turnOn: (inout NotificationPreferences) -> Void
+    }
+
+    /// A notification switch is being turned on (waiting for iOS's prompt). Switches wait for it.
+    private(set) var isTurningOnNotifications = false
+
+    /// The one step every notification switch takes when it's turned on (#130's gate): iOS's
+    /// permission prompt the first time, then the relay notifications sheet unless already agreed
+    /// to. On success, the first time, the choices become the spec defaults (passes for everyone,
+    /// results and records on, delivery summary, quiet hours 10 PM to 8 AM; the Window stays) with
+    /// the tapped switch on. Denied permission, **Not Now** or dismissing the sheet leave
+    /// everything as it was, except that Passes keeps today's in-app notifications after **Not
+    /// Now**.
+    private func notificationSwitchTurnedOn(
+        isPasses: Bool, _ turnOn: @escaping (inout NotificationPreferences) -> Void
+    ) async {
+        guard !isTurningOnNotifications else { return }
+        isTurningOnNotifications = true
+        defer { isTurningOnNotifications = false }
+        let pending = PendingNotificationSwitch(isFirst: !notificationsTurnedOn, turnOn: turnOn)
+        if pending.isFirst {
+            // Passes, as Leaderboard Notifications did, is on at once (in the app) and goes back off
+            // if denied. Any other switch only asks: nothing is saved before it's agreed to.
+            let granted: Bool
+            if isPasses {
+                granted = await services.notifications.setEnabled(true)
+            } else {
+                granted = await services.notifications.requestAuthorization()
+            }
+            notificationChoicesRevision += 1
+            guard granted else {
+                await checkNotificationPermission()
+                return
+            }
+        }
+        if mode == .connected, liveRank.isRelayConfigured, liveRank.relayNotificationsChoice != true {
+            pendingNotificationSwitch = pending
+            relayNotificationsConsentRequested = true
+            await syncRelayNotifications()
+            return
+        }
+        await commit(pending)
+    }
+
+    /// Turns notifications on with this switch, saved for this account, and tells the relay.
+    private func commit(_ pending: PendingNotificationSwitch) async {
+        services.notifications.markEnabled()
+        if mode == .connected, let owner = store.selfCompetitor?.username {
+            var choices = notificationPreferences.load(account: owner)
+            if pending.isFirst { choices = choices.turnedOnDefaults }
+            pending.turnOn(&choices)
+            notificationPreferences.save(choices, account: owner)
+        }
+        notificationChoicesRevision += 1
         await syncRelayNotifications()
+    }
+
+    private func takeNotificationSwitchRequest() -> PendingNotificationSwitch? {
+        defer { pendingNotificationSwitch = nil }
+        relayNotificationsConsentRequested = false
+        return pendingNotificationSwitch
+    }
+
+    private func forgetNotificationSwitchRequest() {
+        relayNotificationsConsentRequested = false
+        pendingNotificationSwitch = nil
+    }
+
+    /// **Turn On**: relay notifications start, with the switch that asked; Live rank stays as it is.
+    func acceptRelayNotifications() async {
+        let pending = takeNotificationSwitchRequest()
+        liveRank.setRelayNotificationsChoice(true)
+        if let pending {
+            await commit(pending)
+        } else {
+            await syncRelayNotifications()
+        }
         await liveRank.sync()
     }
 
     /// **Not Now**: the in-app notifications carry on.
     func declineRelayNotifications() async {
-        relayNotificationsConsentRequested = false
+        forgetNotificationSwitchRequest()
         liveRank.setRelayNotificationsChoice(false)
+        notificationChoicesRevision += 1
         await syncRelayNotifications()
     }
 
     /// Tells the relay the notification choices: this account's, or off. Only the real graph's
-    /// relay hears; while the board's owner isn't known yet (a cold launch), it waits.
+    /// relay hears; while the board's owner isn't known yet (a cold launch), it waits rather than
+    /// say off.
     func syncRelayNotifications() async {
         guard services === realServices else { return }
-        guard relayNotificationsOn else {
+        guard relayNotificationsAllowed else {
             await realLiveRank.relayNotificationsDidChange(nil)
             return
         }
         guard let owner = store.selfCompetitor?.username else { return }
+        let choices = notificationPreferences.load(account: owner)
+        guard choices.anyKindOn else {
+            await realLiveRank.relayNotificationsDidChange(nil)
+            return
+        }
         remoteNotifications.register()
         await realLiveRank.relayNotificationsDidChange(RelayNotificationsConfiguration(
-            preferences: notificationPreferences.load(account: owner),
+            preferences: choices,
             rivals: store.pinnedRivals.map(\.username)
         ))
     }
@@ -490,16 +625,23 @@ final class AppModel {
         mode == .connected && liveRank.isRelayConfigured && liveRank.relayNotificationsChoice != false
     }
 
-    /// This account's notification choices (defaults until one is saved, and on the Sample board).
-    var notificationChoices: NotificationPreferences {
+    /// This account's saved choices (defaults until one is saved, and on the Sample board).
+    private var savedNotificationChoices: NotificationPreferences {
         _ = notificationChoicesRevision
         guard mode == .connected, let owner = store.selfCompetitor?.username else { return NotificationPreferences() }
         return notificationPreferences.load(account: owner)
     }
 
+    /// This account's notification choices as the Notifications screen shows them: until a switch
+    /// has been turned on, every kind reads off.
+    var notificationChoices: NotificationPreferences {
+        var choices = savedNotificationChoices
+        if showsRelayNotificationChoices && !notificationsTurnedOn { choices.turnEveryKindOff() }
+        return choices
+    }
+
     /// Changes a notification choice: saved on this iPhone for this GitHub account, and sent to the
-    /// relay right away. Every row on the Notifications screen goes through here. Nothing is saved
-    /// on the Sample board or before the board's owner is known.
+    /// relay right away. Nothing is saved on the Sample board or before the board's owner is known.
     func updateNotificationChoices(_ change: (inout NotificationPreferences) -> Void) async {
         guard mode == .connected, let owner = store.selfCompetitor?.username else { return }
         var choices = notificationPreferences.load(account: owner)
@@ -507,6 +649,17 @@ final class AppModel {
         notificationPreferences.save(choices, account: owner)
         notificationChoicesRevision += 1
         await syncRelayNotifications()
+    }
+
+    /// Every row on the Notifications screen goes through here (`notificationChoice`). A switch
+    /// turned on (any `Bool` choice: each is a kind of notification) takes the shared step that
+    /// asks for permission and relay consent; anything else is saved and sent right away.
+    func setNotificationChoice<Value>(_ keyPath: WritableKeyPath<NotificationPreferences, Value>, _ value: Value) async {
+        if let on = value as? Bool, on, let kind = keyPath as? WritableKeyPath<NotificationPreferences, Bool> {
+            await notificationSwitchTurnedOn(isPasses: false) { $0[keyPath: kind] = true }
+            return
+        }
+        await updateNotificationChoices { $0[keyPath: keyPath] = value }
     }
 
     /// Quiet hours' switch. Back on, they're the default 10 PM to 8 AM.

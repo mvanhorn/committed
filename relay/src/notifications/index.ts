@@ -15,6 +15,8 @@ import { parseState, type NotificationState } from "./state";
  *
  * One function per kind, each in its own file (`notifyPasses` in passes.ts; close calls, results,
  * records and the streak reminder join it), each reading and returning its own part of the state.
+ * Each kind checks its own choice and returns early when off: `passes: "off"` (the iPhone's
+ * Passes switch off with another kind on) skips passes only, and the kinds after it still run.
  */
 export interface NotificationDeps {
   store: Store;
