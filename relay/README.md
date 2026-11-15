@@ -117,8 +117,8 @@ Registers or updates. `{id}` is 8 to 64 characters of `[A-Za-z0-9-]`; a UUID wor
 - Turning `liveRank` off ends the current activity and forgets Live rank's tokens. The relay
   keeps the alert token only while `notifications` is set.
 - Passes act on `window`, `passes` (`"rivals"` sends only pinned rivals' passes) and quiet hours
-  (#130). `delivery` and the kinds after passes are stored now and take effect in later tickets
-  (#131–#135).
+  (#130); results on `results` and quiet hours (#131). `delivery` and the other kinds are stored
+  now and take effect in later tickets (#132–#135).
 - At most 1,000 competitors, self included.
 - Returns `201` on creation, `200` on update.
 - A changed competitor list resets today's movement baseline, as a visibility change does in
@@ -497,9 +497,35 @@ WIDGET_SCREENS=/some/dir npm run test:browser   # also save a screenshot of each
      }
      ```
 
+   - **Results** (`results.ts`, #131): each morning, yesterday's Today standings; on Mondays also
+     last week's final, the Monday-to-Sunday standings (`fixedWeeks`, a port of `FixedWeek`).
+     They go out at the end of quiet hours, or at 08:00 with quiet hours off, in the
+     installation's time zone, at most once a local day, and wait while it's quiet or your own
+     count is missing. Ranked with `order` among the visible people with data, so a tie is
+     yours. Skipped with no visible rival or when nobody contributed. The first look, or the
+     first after more than a day, settles a morning already past without sending (turning
+     results on at 3 PM doesn't send yesterday's then). Turning `results` off drops its state.
+     Each is one alert with `apns-collapse-id: result.daily` or `result.weekly`, no category, and
+     `"thread-id": "results"`; the app opens the Board on a tap:
+
+     ```json
+     {
+       "aps": {
+         "alert": { "title": "You won yesterday", "body": "41 contributions, 8 ahead of alice." },
+         "sound": "default", "thread-id": "results"
+       },
+       "kind": "result"
+     }
+     ```
+
+     The other copy: "You finished #2 yesterday" / "alice won with 50. You had 41.", "Last
+     week's final: #1" / "186 contributions, 5 ahead of alice." (or "Last week's final: #2" /
+     "bob won with 200. You had 186."). A tie for first says "41 contributions, level with
+     alice."; one contribution is "1 contribution".
    - State lives in one JSON column, `notification_state`, keyed by kind
-     (`{"passes": {"window", "date", "counts"}}`). It's saved before anything is sent, so a
-     failure can't send the same pass twice. Later kinds add their own keys.
+     (`{"passes": {"window", "date", "counts"}, "results": {"date"}}`). It's saved before
+     anything is sent, so a failure can't send the same notification twice. Later kinds add
+     their own keys and keep the ones they don't own.
    - A dead alert token is cleared (only if it's still the stored one) and logged as
      `token_cleared` with `token: "alert"`.
 
@@ -511,7 +537,10 @@ APNs auth is an ES256 JWT signed with WebCrypto from the `.p8` key and cached fo
 `passes` cases run against `RankChangeDetector` and `NotificationService.copy(for:)` in
 `CommitStandingsTests/HabitPassConformanceTests.swift`, and against `src/notifications/passes.ts`
 in `test/habitPasses.test.ts`, so a pass the app would post is the pass the relay sends, in the
-same words.
+same words. Its `weeks` cases run against `FixedWeek` in
+`CommitStandingsTests/HabitWeekConformanceTests.swift` and against `fixedWeeks` in
+`test/habitWeeks.test.ts`, so last week's final covers the same Monday to Sunday as the app's
+weeks.
 
 `../fixtures/ranking-conformance.json` is shared with the Mac test target and the Windows core
 (`windows/core/tests/conformance.rs`, which checks `order` and streaks: Windows has no Live rank),
