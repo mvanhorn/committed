@@ -59,12 +59,12 @@ struct AboutYourRivalsSection: View {
         // Before relay notifications are agreed to, the app's own ones are all there is.
         let closed = model.relayNotificationsOn ? ", even with Committed closed" : ""
         guard model.notificationChoices.passes == .rivals else {
-            return "When anyone on your board passes you or you pass them, on \(window)\(closed)."
+            return "When anyone on your board passes you or you pass them, judged on \(window)\(closed)."
         }
         let rivals = model.store.pinnedRivals.map(\.username)
         guard !rivals.isEmpty else {
             return "Pin up to \(StandingsStore.maxPinnedRivals) rivals with Rival in their view. Until then, no passes are sent."
         }
-        return "When \(rivals.formatted(.list(type: .or))) passes you or you pass them, on \(window)\(closed)."
+        return "When \(rivals.formatted(.list(type: .or))) passes you or you pass them, judged on \(window)\(closed)."
     }
 }
