@@ -1,0 +1,61 @@
+{
+  "device": "iPhone Duo Simulator (shared persistent Duo 94D56458-B90B-484A-BA5E-16748D2CBEE5), closed, portrait",
+  "os": "iOS 27.1",
+  "notes": "Runtime captures, not renders. The switch's states are set through the fixture (no tap access from the agent); the tap is a notification response injected by launch argument through the delegate's own route, not a delivered notification. The open iPhone Duo and accessibility text sizes were not captured.",
+  "screenshots": [
+    {
+      "file": "before-notifications.png",
+      "caption": "Before (#130): About your rivals with Passes, People and Window, no Close calls row; copied from docs/screenshots/130-notifications-screen/notifications-default.png",
+      "capture": {
+        "sourceCommit": "0e4f03043fb38ba716059798245643b00d87c940",
+        "fixture": true
+      },
+      "notes": "Captured for #130 with the same fixture flags (-ScreenshotTab settings -ScreenshotNotifications)."
+    },
+    {
+      "file": "notifications-close-calls-off.png",
+      "caption": "After: the Close calls switch between People and Window, off by default, with its line \"When you're a few contributions behind the person just above you.\" (nobody pinned)",
+      "capture": {
+        "sourceCommit": "48927530b257356718d5e538fc29d4d758d82481",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotTab settings -ScreenshotNotifications."
+    },
+    {
+      "file": "notifications-close-calls-on.png",
+      "caption": "Close calls on (saved per account through model.notificationChoice(\\.closeCalls), nobody pinned)",
+      "capture": {
+        "sourceCommit": "48927530b257356718d5e538fc29d4d758d82481",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotTab settings -ScreenshotNotifications -ScreenshotCloseCalls."
+    },
+    {
+      "file": "notifications-close-calls-pinned.png",
+      "caption": "Close calls on with odile-m and ezra-q pinned: the line names them (\"behind odile-m or ezra-q\")",
+      "capture": {
+        "sourceCommit": "48927530b257356718d5e538fc29d4d758d82481",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotTab settings -ScreenshotNotifications -ScreenshotCloseCalls -ScreenshotPin odile-m,ezra-q."
+    },
+    {
+      "file": "notifications-no-relay.png",
+      "caption": "Without the relay (as on the Sample board and after Not Now): only Passes; no Close calls row",
+      "capture": {
+        "sourceCommit": "48927530b257356718d5e538fc29d4d758d82481",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotTab settings -ScreenshotNotifications -ScreenshotNoRelay."
+    },
+    {
+      "file": "close-call-tap-person-view.png",
+      "caption": "Tapping a close call about odile-m (launched on Settings) opens odile-m's person view on the Board",
+      "capture": {
+        "sourceCommit": "48927530b257356718d5e538fc29d4d758d82481",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotTab settings -ScreenshotNotificationKind closeCall -ScreenshotNotificationResponse com.apple.UNNotificationDefaultActionIdentifier:odile-m (the relay's close-call payload {kind: closeCall, login} fed through ForegroundNotificationPresenter.receive -> DeepLink(notification:action:) -> AppModel.open; no notification was shown or tapped)."
+    }
+  ]
+}

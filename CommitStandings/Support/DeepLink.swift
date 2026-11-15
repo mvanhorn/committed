@@ -45,8 +45,9 @@ enum DeepLink: Equatable, Sendable {
     static let bodyTapAction = "com.apple.UNNotificationDefaultActionIdentifier"
 
     /// Where a tapped pass notification goes: the body opens the rival's view, Share your race opens
-    /// it with their Challenge share, Open Board opens the Board. Nil for anything else (another kind,
-    /// a dismissal, an unknown action), and the app just opens.
+    /// it with their Challenge share, Open Board opens the Board. A tapped close call (#132) opens that
+    /// person's view. Nil for anything else (another kind, a dismissal, an unknown action), and the
+    /// app just opens.
     init?(notification userInfo: [AnyHashable: Any], action: String = Self.bodyTapAction) {
         let login = (userInfo["login"] as? String).flatMap(UsernameNormalization.normalize)
         // A relay close call (#132) has no actions: tapping it opens that person's view.
