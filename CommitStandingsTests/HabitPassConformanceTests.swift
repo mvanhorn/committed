@@ -13,10 +13,16 @@ struct HabitPassConformanceTests {
 
     struct PassCase: Decodable {
         let name: String
-        let `self`: String
+        /// The fixture's `self`: whose board it is.
+        let selfLogin: String
         let previous: [String: Int]?
         let current: [String: Int]
         let expected: [Expected]
+
+        private enum CodingKeys: String, CodingKey {
+            case name, previous, current, expected
+            case selfLogin = "self"
+        }
     }
 
     struct Expected: Decodable, Equatable {
@@ -46,7 +52,7 @@ struct HabitPassConformanceTests {
     @Test func detectorAndCopyMatchEveryCase() throws {
         for fixtureCase in try Self.loadFixture().passes {
             let events = RankChangeDetector.crossings(
-                previous: fixtureCase.previous, current: fixtureCase.current, selfUsername: fixtureCase.self
+                previous: fixtureCase.previous, current: fixtureCase.current, selfUsername: fixtureCase.selfLogin
             )
             let actual = events.map { event in
                 let copy = NotificationService.copy(for: event)
