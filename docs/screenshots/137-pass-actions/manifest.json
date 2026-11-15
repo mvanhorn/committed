@@ -1,0 +1,39 @@
+{
+  "device": "iPhone Duo Simulator (shared persistent Duo 94D56458), closed",
+  "os": "iOS 27.1",
+  "notes": "Runtime captures of the Debug app on the screenshot fixture (Sample board data). Each launch opens on Settings with -ScreenshotNotificationResponse <action>:ezra-q, which feeds a relay pass response through the notification delegate's own route (ForegroundNotificationPresenter.receive -> DeepLink(notification:action:) -> AppModel.open) once the fixture's people load. Response injected by launch argument: no notification was shown, expanded or tapped. The expanded notification itself could not be captured: granting notification permission needs a tap on the iOS prompt (simctl push fails with UNErrorDomain 2003 'Source is not authorized'), and Xcode's device-interaction tools were waiting for approval in Xcode's MCP menu. No before state for the actions: they are new.",
+  "screenshots": [
+    {
+      "file": "before-settings.png",
+      "caption": "Starting point for each capture: the fixture launched on Settings, with no notification response",
+      "capture": {
+        "sourceCommit": "d795ce9459a399161e59d50b72421fab7c973ab0",
+        "fixture": true
+      }
+    },
+    {
+      "file": "share-your-race.png",
+      "caption": "Share your race (SHARE_RACE on a pass about ezra-q): ezra-q's view opens and their Challenge share sheet presents once the race has loaded. Runtime capture, fixture; response injected by launch argument, no notification tapped",
+      "capture": {
+        "sourceCommit": "d795ce9459a399161e59d50b72421fab7c973ab0",
+        "fixture": true
+      }
+    },
+    {
+      "file": "open-board.png",
+      "caption": "Open Board (OPEN_BOARD on a pass about ezra-q): the Board opens on its Window (Today). Runtime capture, fixture; response injected by launch argument, no notification tapped",
+      "capture": {
+        "sourceCommit": "d795ce9459a399161e59d50b72421fab7c973ab0",
+        "fixture": true
+      }
+    },
+    {
+      "file": "body-tap.png",
+      "caption": "Tapping the notification body (iOS's default action): ezra-q's view opens, with no share sheet, as before. Runtime capture, fixture; response injected by launch argument, no notification tapped",
+      "capture": {
+        "sourceCommit": "d795ce9459a399161e59d50b72421fab7c973ab0",
+        "fixture": true
+      }
+    }
+  ]
+}

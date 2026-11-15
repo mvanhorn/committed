@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UserNotifications
 @testable import CommitStandingsiOS
 
 /// Relay notifications on iPhone (spec #124, #126): consent, what the relay is told, one source of
@@ -19,7 +20,9 @@ struct RelayNotificationsTests {
         relay.pushUpdates = .token
     }
 
-    private func makeModel(signedIn: Bool = true, notificationsOn: Bool = false) -> (AppModel, FakeContributions) {
+    private func makeModel(
+        signedIn: Bool = true, notificationsOn: Bool = false, saved: [Competitor] = []
+    ) -> (AppModel, FakeContributions) {
         defaults.set(notificationsOn, forKey: NotificationService.enabledDefaultsKey)
         let session: URLSession = {
             let config = URLSessionConfiguration.ephemeral
@@ -29,8 +32,10 @@ struct RelayNotificationsTests {
         let clock = clock
         let posted = posted
         let contributions = FakeContributions(["me": 3, "ada": 5, "bo": 1])
+        let people = InMemoryCompetitorPersistence()
+        people.save(saved)
         let services = CommittedServices(
-            store: StandingsStore(persistence: InMemoryCompetitorPersistence()),
+            store: StandingsStore(persistence: people),
             credentials: InMemoryGitHubCredentialStore(token: signedIn ? "gho_test" : nil),
             contributions: contributions,
             notifications: NotificationService(defaults: defaults, authorize: { true }, sink: { posted.events += $0 }),
@@ -267,6 +272,119 @@ struct RelayNotificationsTests {
         #expect(DeepLink(url: URL(string: "committed://person/")!) == nil)
         #expect(DeepLink(url: URL(string: "committed://person/a/b")!) == nil)
         #expect(DeepLink(notification: ["kind": "result"]) == nil)
+    }
+
+    // MARK: Pass actions (#137)
+
+    @Test func challengeLinksRoundTrip() {
+        #expect(DeepLink.challenge(login: "ada").url.absoluteString == "committed://challenge/ada")
+        #expect(DeepLink(url: URL(string: "committed://challenge/Ada")!) == .challenge(login: "ada"))
+        #expect(DeepLink(url: URL(string: "committed://challenge/")!) == nil)
+        #expect(DeepLink(url: URL(string: "committed://challenge/a/b")!) == nil)
+    }
+
+    private let pass: [AnyHashable: Any] = ["kind": "pass", "login": "Ada", "aps": ["category": "PASS"]]
+
+    @Test func aBodyTapIsWhatIOSCallsTheDefaultAction() {
+        #expect(DeepLink.bodyTapAction == UNNotificationDefaultActionIdentifier)
+    }
+
+    @Test func eachPassActionHasItsOwnDestination() {
+        // What iOS hands the app: the system's identifier for a body tap, or the action's.
+        #expect(DeepLink(notification: pass, action: "com.apple.UNNotificationDefaultActionIdentifier")
+            == .person(login: "ada"))
+        #expect(DeepLink(notification: pass, action: "SHARE_RACE") == .challenge(login: "ada"))
+        #expect(DeepLink(notification: pass, action: "OPEN_BOARD") == .board(window: nil))
+    }
+
+    @Test func passActionsWithoutAUsableLogin() {
+        let noLogin: [AnyHashable: Any] = ["kind": "pass", "aps": ["category": "PASS"]]
+        #expect(DeepLink(notification: noLogin, action: "SHARE_RACE") == nil)
+        #expect(DeepLink(notification: noLogin, action: "OPEN_BOARD") == .board(window: nil))
+    }
+
+    @Test func otherResponsesGoNowhere() {
+        #expect(DeepLink(notification: pass, action: "com.apple.UNNotificationDismissActionIdentifier") == nil)
+        #expect(DeepLink(notification: pass, action: "SOMETHING_ELSE") == nil)
+        #expect(DeepLink(notification: ["kind": "result"], action: "OPEN_BOARD") == nil)
+    }
+
+    @Test func passNotificationsOfferShareYourRaceAndOpenBoard() throws {
+        let category = try #require(ForegroundNotificationPresenter.categories.first { $0.identifier == "PASS" })
+        #expect(category.actions.map(\.identifier) == ["SHARE_RACE", "OPEN_BOARD"])
+        #expect(category.actions.map(\.title) == ["Share your race", "Open Board"])
+        // Both open Committed, from a locked phone too.
+        #expect(category.actions.allSatisfy { $0.options.contains(.foreground) })
+        #expect(ForegroundNotificationPresenter.categories.count == 1)
+    }
+
+    @Test func aResponseBeforeTheAppIsReadyWaitsForIt() {
+        // A cold launch: iOS hands over the response before RootView attaches `open`.
+        let attached = ForegroundNotificationPresenter.open
+        defer { ForegroundNotificationPresenter.open = attached }
+        ForegroundNotificationPresenter.open = nil
+
+        ForegroundNotificationPresenter.receive(.challenge(login: "ada"))
+        var opened: [DeepLink] = []
+        ForegroundNotificationPresenter.open = { opened.append($0) }
+        #expect(opened == [.challenge(login: "ada")])
+
+        // Delivered once; later responses go straight through.
+        ForegroundNotificationPresenter.receive(.board(window: nil))
+        #expect(opened == [.challenge(login: "ada"), .board(window: nil)])
+    }
+
+    @Test func shareYourRaceOpensTheirViewAndAsksForTheChallenge() async {
+        let (model, _) = makeModel()
+        await model.sceneDidBecomeActive()
+        model.selectedTab = .settings
+
+        model.open(DeepLink(notification: pass, action: "SHARE_RACE")!)
+
+        #expect(model.selectedTab == .board)
+        #expect(model.selectedPerson == "ada")
+        #expect(model.requestedChallenge == "ada")
+    }
+
+    @Test func shareYourRaceAboutSomeoneNoLongerOnTheBoardOpensTheBoard() async {
+        let (model, _) = makeModel()
+        await model.sceneDidBecomeActive()
+        model.store.setHidden(true, username: "ada")
+        model.selectedTab = .people
+
+        model.open(DeepLink(notification: pass, action: "SHARE_RACE")!)
+
+        #expect(model.selectedTab == .board)
+        #expect(model.selectedPerson == nil)
+        #expect(model.requestedChallenge == nil)
+    }
+
+    @Test func openBoardOpensTheBoardOnItsWindow() async {
+        let (model, _) = makeModel()
+        await model.sceneDidBecomeActive()
+        model.store.selectedWindow = .weekly
+        model.showPerson("bo")
+        model.selectedTab = .settings
+
+        model.open(DeepLink(notification: pass, action: "OPEN_BOARD")!)
+
+        #expect(model.selectedTab == .board)
+        #expect(model.store.selectedWindow == .weekly)
+    }
+
+    @Test func shareYourRaceFromAColdLaunchWaitsForTheRace() async {
+        // Committed was closed: the action arrives before the first refresh, with only the people
+        // saved last time.
+        let (model, _) = makeModel(saved: [Competitor(username: "me", isSelf: true),
+                                           Competitor(username: "ada", isSelf: false)])
+
+        model.open(DeepLink(notification: pass, action: "SHARE_RACE")!)
+        #expect(model.selectedTab == .board)
+        #expect(model.selectedPerson == "ada")
+
+        await model.sceneDidBecomeActive()
+        #expect(model.selectedPerson == "ada")
+        #expect(model.requestedChallenge == "ada")
     }
 }
 

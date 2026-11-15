@@ -27,7 +27,7 @@ export interface AlertPayload {
   aps: {
     alert: { title: string; body: string };
     sound?: "default";
-    /** `PASS` for passes (its actions arrive in #137). */
+    /** `PASS` for passes: the iPhone registers its actions (Share your race, Open Board). */
     category?: string;
     /** One per kind, so iOS groups them. */
     "thread-id": string;

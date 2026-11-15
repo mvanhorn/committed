@@ -715,8 +715,9 @@ final class AppModel {
     // MARK: - Deep links
 
     /// `committed://board?window=…` opens the Board on that Window; `committed://person/<login>` opens
-    /// that person's view on the Board, or just the Board when they're not on it (hidden, or gone).
-    /// Returns whether it handled the URL.
+    /// that person's view on the Board, or just the Board when they're not on it (hidden, or gone);
+    /// `committed://challenge/<login>` does the same and presents their Challenge share once their
+    /// race loads (a pass notification's Share your race). Returns whether it handled the URL.
     @discardableResult
     func open(_ url: URL) -> Bool {
         guard let link = DeepLink(url: url) else { return false }
@@ -731,7 +732,14 @@ final class AppModel {
             if let window { store.selectedWindow = window }
         case .person(let login):
             selectedTab = .board
-            selectedPerson = store.visibleCompetitors.contains { $0.username == login } ? login : nil
+            selectedPerson = isOnBoard(login) ? login : nil
+        case .challenge(let login):
+            guard isOnBoard(login) else { return open(.person(login: login)) }
+            requestChallenge(login)
         }
+    }
+
+    private func isOnBoard(_ login: String) -> Bool {
+        store.visibleCompetitors.contains { $0.username == login }
     }
 }

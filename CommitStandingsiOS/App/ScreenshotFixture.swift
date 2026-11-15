@@ -18,7 +18,8 @@ import UIKit
 /// `-ScreenshotPerson <login>` opens that person's view (pushed onto the Board, or the second pane on the open
 /// iPhone Duo) and `-ScreenshotPersonDay <n>` selects that day's bar instead of today's
 /// (`-ScreenshotPersonEnd` scrolls it to the end), `-ScreenshotChallenge <login>` opens that person's
-/// view and their Challenge share once their race loads (as a notification's Share your race will),
+/// view and their Challenge share once their race loads (as a notification's Share your race does),
+/// `-ScreenshotNotificationResponse <action>:<login>` responds to a relay pass notification at launch,
 /// `-ScreenshotTroll <login>` gives that person a trolling day (784 more, the troll face),
 /// `-ScreenshotCalendarFrom <login>=<YYYY-MM-DD>` starts that person's calendar on that day once the
 /// board loads (empty weeks in their Weekly record),
@@ -66,6 +67,19 @@ enum ScreenshotFixture {
     /// once their race has loaded, through `AppModel.requestChallenge`.
     static var requestedChallenge: String? {
         value(after: "-ScreenshotChallenge")
+    }
+
+    /// `-ScreenshotNotificationResponse <action>:<login>`: at launch, a response to a relay pass
+    /// notification about `login`, as if `action` (`SHARE_RACE`, `OPEN_BOARD`, or iOS's body-tap
+    /// identifier) had been chosen with Committed closed. Once the fixture's people load, it goes
+    /// through the notification delegate's own route (`ForegroundNotificationPresenter.receive`).
+    /// No notification is shown or tapped.
+    static var notificationResponse: DeepLink? {
+        guard let raw = value(after: "-ScreenshotNotificationResponse"),
+              let colon = raw.lastIndex(of: ":") else { return nil }
+        let action = String(raw[..<colon]), login = String(raw[raw.index(after: colon)...])
+        return DeepLink(notification: ["kind": "pass", "login": login, "aps": ["category": DeepLink.passCategory]],
+                        action: action)
     }
 
     /// `-ScreenshotPersonDay <n>`: the person view's selected bar, instead of today's.
