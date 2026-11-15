@@ -29,8 +29,9 @@ import UIKit
 /// the thousands beside the streaks, the board's widest rows), and
 /// `-LiveRankPayload <file.json>` shows a Live Activity push payload's content state in Live rank,
 /// `-ScreenshotNotifications` opens Settings ▸ Notifications (with `-ScreenshotTab settings`),
-/// `-ScreenshotPasses rivals`, `-ScreenshotRecords off` and `-ScreenshotQuietHours 23:30-07:00` (or
-/// `off`) set the board owner's notification choices, `-ScreenshotNotificationsDenied` reads iOS's permission as denied,
+/// `-ScreenshotPasses rivals`, `-ScreenshotCloseCalls`, `-ScreenshotRecords off` and `-ScreenshotQuietHours
+/// 23:30-07:00` (or `off`) set the board owner's notification choices, `-ScreenshotNotificationsDenied`
+/// reads iOS's permission as denied,
 /// `-ScreenshotNoRelay` runs a relay build as one without the relay,
 /// and `-RelayDisclosureAccepted` starts with the Committed relay disclosure already accepted (for
 /// builds with `COMMITTED_RELAY_URL`; without it, a relay build shows the disclosure sheet).
@@ -73,11 +74,15 @@ enum ScreenshotFixture {
     /// notification about `login`, as if `action` (`SHARE_RACE`, `OPEN_BOARD`, or iOS's body-tap
     /// identifier) had been chosen with Committed closed. Once the fixture's people load, it goes
     /// through the notification delegate's own route (`ForegroundNotificationPresenter.receive`).
-    /// No notification is shown or tapped.
+    /// No notification is shown or tapped. `-ScreenshotNotificationKind closeCall` makes it a relay
+    /// close call (#132) instead, which has no category.
     static var notificationResponse: DeepLink? {
         guard let raw = value(after: "-ScreenshotNotificationResponse"),
               let colon = raw.lastIndex(of: ":") else { return nil }
         let action = String(raw[..<colon]), login = String(raw[raw.index(after: colon)...])
+        if value(after: "-ScreenshotNotificationKind") == "closeCall" {
+            return DeepLink(notification: ["kind": "closeCall", "login": login], action: action)
+        }
         return DeepLink(notification: ["kind": "pass", "login": login, "aps": ["category": DeepLink.passCategory]],
                         action: action)
     }
@@ -141,11 +146,15 @@ enum ScreenshotFixture {
     }
 
     /// The board owner's notification choices, in memory: the defaults, with `-ScreenshotPasses`,
-    /// `-ScreenshotRecords off` and `-ScreenshotQuietHours <start>-<end>|off` applied.
+    /// `-ScreenshotCloseCalls` (Close calls on), `-ScreenshotRecords off` and
+    /// `-ScreenshotQuietHours <start>-<end>|off` applied.
     static func notificationPreferences() -> InMemoryNotificationPreferences {
         var choices = NotificationPreferences()
         if let passes = value(after: "-ScreenshotPasses").flatMap(NotificationPreferences.Passes.init(rawValue:)) {
             choices.passes = passes
+        }
+        if ProcessInfo.processInfo.arguments.contains("-ScreenshotCloseCalls") {
+            choices.closeCalls = true
         }
         if value(after: "-ScreenshotRecords") == "off" {
             choices.records = false
