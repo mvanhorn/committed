@@ -37,6 +37,14 @@ struct CommittedApp: App {
             if let tab = ScreenshotFixture.requestedTab { model.selectedTab = tab }
             model.selectedPerson = ScreenshotFixture.requestedPerson
             if let login = ScreenshotFixture.requestedChallenge { model.requestChallenge(login) }
+            if let link = ScreenshotFixture.notificationResponse {
+                // The fixture starts with nobody saved, where a real cold launch has last time's
+                // people; the response arrives once they've loaded.
+                Task {
+                    await model.roster.refresh(force: true)
+                    ForegroundNotificationPresenter.receive(link)
+                }
+            }
             return model
         }
         #endif
