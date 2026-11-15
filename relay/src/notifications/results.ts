@@ -136,7 +136,8 @@ export async function notifyResults(
   }
   const today = localDate(now, row.time_zone);
   const settled = readState(state.results);
-  if (settled === today) return state;
+  // Settled today, or later (a time zone change can move the local date back): nothing to send.
+  if (settled !== null && settled >= today) return state;
   const yesterday = addDays(today, -1);
   const firstLook = settled === null || settled < yesterday;
   const due = localMinutes(now, row.time_zone) >= sendMinutes(preferences.quietHours);

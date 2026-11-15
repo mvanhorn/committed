@@ -159,6 +159,20 @@ describe("the daily result", () => {
     expect(results().map((alert) => alert.payload.aps.alert.title)).toEqual(["You won yesterday"]);
   });
 
+  it("isn't sent twice when a time zone change moves the local date back", async () => {
+    // 08:00 on Nov 13 in Auckland (UTC+13) is 09:00 on Nov 12 in Honolulu (UTC−10).
+    clock.seconds = Date.UTC(2026, 10, 12, 18, 30) / 1000;
+    github.set("me", { "2026-11-11": 41, "2026-11-12": 30 });
+    github.set("alice", { "2026-11-11": 33, "2026-11-12": 20 });
+    await register({}, { timeZone: "Pacific/Auckland" });
+    await runThrough(Date.UTC(2026, 10, 12, 19, 0) / 1000);
+    expect(results()).toHaveLength(1);
+
+    await register({}, { timeZone: "Pacific/Honolulu" });
+    await runThrough(Date.UTC(2026, 10, 12, 20, 0) / 1000);
+    expect(results()).toHaveLength(1);
+  });
+
   it("is skipped with no visible rivals", async () => {
     await register({}, { competitors: ["me"] });
     await runThrough(ny(12, 9, 0));
