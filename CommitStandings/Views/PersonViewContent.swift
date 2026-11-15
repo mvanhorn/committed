@@ -99,6 +99,12 @@ struct PersonViewContent<Tip: View>: View {
                     if let race = person.race {
                         raceCard(race)
                     }
+                    #if os(iOS)
+                    // The iPhone's Weekly record, under Your race (`WeeklyRecordCard`, iPhone app only).
+                    if let rivalry = person.rivalry {
+                        WeeklyRecordCard(record: rivalry, login: person.login)
+                    }
+                    #endif
                     stats(days)
                 }
                 if part.month {

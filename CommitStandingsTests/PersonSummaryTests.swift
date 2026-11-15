@@ -206,6 +206,64 @@ struct PersonSummaryTests {
         #expect(ana.race == nil)
     }
 
+    // MARK: The weekly rivalry record
+
+    /// Me and Ana from Monday September 14, with today Wednesday November 25: weeks up to Sunday
+    /// November 22 are finished. Ana wins the week of November 16 with 9; every other week is
+    /// level at 0 or mine.
+    static func weeklyStore() -> StandingsStore {
+        store(rivals: ["ana"], histories: [
+            "me": history(through: "2026-11-25", ["2026-11-02": 2, "2026-11-24": 30]),
+            "ana": history(through: "2026-11-25", ["2026-11-18": 9]),
+        ])
+    }
+
+    @Test func aRivalsViewHasTheWeeklyRecordOverTheLast12FinishedWeeks() throws {
+        let ana = try #require(Self.weeklyStore().person("ana", asOf: Self.noon("2026-11-25"), calendar: Self.utc))
+        let record = try #require(ana.rivalry)
+        // Weeks of August 31 … November 16: the two before September 14 are empty, this week's 30
+        // doesn't count, and level weeks are mine.
+        #expect(record.weeks == [.none, .none] + Array(repeating: .win, count: 9) + [.loss])
+        #expect(record.text == "9–1")
+        #expect(record.longestRun == 9)
+        #expect(record.runCaption == "Longest run: 9 weeks in a row")
+        #expect(record.spoken(against: ana.login) == "You’ve won 9 of the last 10 weeks against ana")
+    }
+
+    @Test func yourOwnViewHasNoWeeklyRecord() throws {
+        let me = try #require(Self.weeklyStore().person("me", asOf: Self.noon("2026-11-25"), calendar: Self.utc))
+        #expect(me.rivalry == nil)
+    }
+
+    @Test func noWeeklyRecordBeforeAFinishedWeekForBothOfYou() throws {
+        // Ana's calendar starts Tuesday November 17: the week of November 16 isn't hers.
+        let store = Self.store(rivals: ["ana"], histories: [
+            "me": Self.history(through: "2026-11-25", [:]),
+            "ana": Self.history(from: "2026-11-17", through: "2026-11-25", [:]),
+        ])
+        let ana = try #require(store.person("ana", asOf: Self.noon("2026-11-25"), calendar: Self.utc))
+        #expect(ana.rivalry == nil)
+        let later = try #require(store.person("ana", asOf: Self.noon("2026-12-01"), calendar: Self.utc))
+        // A week later, the week of November 23 is finished for both.
+        #expect(later.rivalry?.text == "1–0")
+        #expect(later.rivalry?.spoken(against: "ana") == "You won the last week against ana")
+    }
+
+    @Test(arguments: [
+        (0, "No wins in these weeks yet"), (1, "Longest run: 1 week"), (4, "Longest run: 4 weeks in a row"),
+    ])
+    func theRunCaption(_ wins: Int, _ caption: String) {
+        let record = RivalryRecord(weeks: Array(repeating: .win, count: wins)
+                                   + Array(repeating: .loss, count: RivalryRecord.weekCount - wins))
+        #expect(record.runCaption == caption)
+    }
+
+    @Test func aLostOnlyWeekReadsAsALoss() {
+        let record = RivalryRecord(weeks: Array(repeating: .none, count: 11) + [.loss])
+        #expect(record.text == "0–1")
+        #expect(record.spoken(against: "ana") == "You lost the last week against ana")
+    }
+
     @Test(arguments: [
         // [yours], [theirs], story, headline, story line
         ([1, 2, 3], [1, 2, 3], PersonSummary.Story.level, "Level with ana", "Level for all 3 days"),

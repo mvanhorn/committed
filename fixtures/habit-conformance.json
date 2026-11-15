@@ -1,0 +1,258 @@
+{
+  "version": 1,
+  "about": "Shared habit-loop conformance cases (spec #124). Consumed by CommitStandingsTests/Habit*ConformanceTests.swift and relay/test/habit*.test.ts. Windows does not consume it. Expected values are worked by hand.",
+  "passes": [],
+  "weeks": [
+    {
+      "about": "Fixed weeks (#129; the relay's last week's final ports the same rule in #131). A week is Monday through Sunday in `timeZone`, named by its first and last day keys (YYYY-MM-DD). `now` is a Unix time; `local` is that time in `timeZone`, for reading the case. `thisWeek` contains today; `lastWeek` is the finished week before it, the one last week's final and the rivalry record's newest square use. A week is always 7 civil days, whatever the clocks do, and which week it is depends only on the local day.",
+      "name": "Monday just after the fall-back Sunday (New York)",
+      "input": { "timeZone": "America/New_York", "now": 1793597400, "local": "2026-11-02T00:30-05:00" },
+      "expected": {
+        "thisWeek": { "first": "2026-11-02", "last": "2026-11-08" },
+        "lastWeek": { "first": "2026-10-26", "last": "2026-11-01" }
+      }
+    },
+    {
+      "name": "the end of the 25-hour fall-back Sunday is still that week (New York)",
+      "input": { "timeZone": "America/New_York", "now": 1793593800, "local": "2026-11-01T23:30-05:00" },
+      "expected": {
+        "thisWeek": { "first": "2026-10-26", "last": "2026-11-01" },
+        "lastWeek": { "first": "2026-10-19", "last": "2026-10-25" }
+      }
+    },
+    {
+      "name": "Monday midnight after the spring-forward Sunday (New York)",
+      "input": { "timeZone": "America/New_York", "now": 1773028800, "local": "2026-03-09T00:00-04:00" },
+      "expected": {
+        "thisWeek": { "first": "2026-03-09", "last": "2026-03-15" },
+        "lastWeek": { "first": "2026-03-02", "last": "2026-03-08" }
+      }
+    },
+    {
+      "name": "the last minute of the 23-hour spring-forward Sunday (New York)",
+      "input": { "timeZone": "America/New_York", "now": 1773028740, "local": "2026-03-08T23:59-04:00" },
+      "expected": {
+        "thisWeek": { "first": "2026-03-02", "last": "2026-03-08" },
+        "lastWeek": { "first": "2026-02-23", "last": "2026-03-01" }
+      }
+    },
+    {
+      "name": "Monday after British Summer Time ends (London)",
+      "input": { "timeZone": "Europe/London", "now": 1792973700, "local": "2026-10-26T00:15+00:00" },
+      "expected": {
+        "thisWeek": { "first": "2026-10-26", "last": "2026-11-01" },
+        "lastWeek": { "first": "2026-10-19", "last": "2026-10-25" }
+      }
+    },
+    {
+      "name": "the last minute of the Sunday British Summer Time ends (London)",
+      "input": { "timeZone": "Europe/London", "now": 1792972740, "local": "2026-10-25T23:59+00:00" },
+      "expected": {
+        "thisWeek": { "first": "2026-10-19", "last": "2026-10-25" },
+        "lastWeek": { "first": "2026-10-12", "last": "2026-10-18" }
+      }
+    },
+    {
+      "name": "already Monday in Auckland while it's still Sunday in UTC",
+      "input": { "timeZone": "Pacific/Auckland", "now": 1794744000, "local": "2026-11-16T01:00+13:00" },
+      "expected": {
+        "thisWeek": { "first": "2026-11-16", "last": "2026-11-22" },
+        "lastWeek": { "first": "2026-11-09", "last": "2026-11-15" }
+      }
+    },
+    {
+      "name": "still Sunday in Los Angeles while it's already Monday in UTC",
+      "input": { "timeZone": "America/Los_Angeles", "now": 1794805200, "local": "2026-11-15T21:00-08:00" },
+      "expected": {
+        "thisWeek": { "first": "2026-11-09", "last": "2026-11-15" },
+        "lastWeek": { "first": "2026-11-02", "last": "2026-11-08" }
+      }
+    },
+    {
+      "name": "Monday after daylight saving time starts (Auckland)",
+      "input": { "timeZone": "Pacific/Auckland", "now": 1790508600, "local": "2026-09-28T00:30+13:00" },
+      "expected": {
+        "thisWeek": { "first": "2026-09-28", "last": "2026-10-04" },
+        "lastWeek": { "first": "2026-09-21", "last": "2026-09-27" }
+      }
+    },
+    {
+      "name": "a week that crosses the new year",
+      "input": { "timeZone": "UTC", "now": 1798804800, "local": "2027-01-01T12:00+00:00" },
+      "expected": {
+        "thisWeek": { "first": "2026-12-28", "last": "2027-01-03" },
+        "lastWeek": { "first": "2026-12-21", "last": "2026-12-27" }
+      }
+    },
+    {
+      "name": "midweek",
+      "input": { "timeZone": "UTC", "now": 1794398400, "local": "2026-11-11T12:00+00:00" },
+      "expected": {
+        "thisWeek": { "first": "2026-11-09", "last": "2026-11-15" },
+        "lastWeek": { "first": "2026-11-02", "last": "2026-11-08" }
+      }
+    }
+  ],
+  "rivalry": [
+    {
+      "about": "The rivalry record (#129): your weekly wins and losses against one person over the last 12 finished weeks. Input: `you` and `them` as {YYYY-MM-DD: n} calendars read in `timeZone` (yours, which decides the weeks; see `weeks`); `now` is a Unix time and `local` that time in `timeZone`. The 12 weeks are the ones before this week, oldest first. A week is played when it starts (its Monday) on or after both calendars' first day; earlier weeks, including one a calendar starts partway through, are `none`. In a played week a missing day is 0. `win`: your Monday-to-Sunday total is at least theirs (ties count for you, even 0 to 0); `loss`: theirs is higher. `longestRun` is your most wins in a row among the 12 weeks; earlier weeks never extend it. `text` is wins–losses with an en dash. `expected` is null when no week is played: the person view shows no Weekly record.",
+      "name": "7–5 with a longest run of 4; this week's days don't count",
+      "input": {
+        "timeZone": "America/New_York",
+        "now": 1794841200,
+        "local": "2026-11-16T10:00-05:00",
+        "you": {
+          "2026-08-01": 0, "2026-08-26": 5, "2026-09-01": 2, "2026-09-07": 6, "2026-09-14": 1, "2026-09-20": 3,
+          "2026-09-23": 4, "2026-09-29": 9, "2026-10-06": 1, "2026-10-20": 10, "2026-10-27": 3, "2026-11-03": 8,
+          "2026-11-10": 2
+        },
+        "them": {
+          "2026-08-01": 0, "2026-08-27": 3, "2026-09-06": 4, "2026-09-08": 1, "2026-09-14": 2, "2026-09-15": 1,
+          "2026-09-24": 4, "2026-09-30": 8, "2026-10-07": 7, "2026-10-13": 1, "2026-10-21": 2, "2026-11-01": 5,
+          "2026-11-04": 6, "2026-11-15": 3, "2026-11-16": 50
+        }
+      },
+      "expected": {
+        "weeks": ["win", "loss", "win", "win", "win", "win", "loss", "loss", "win", "loss", "win", "loss"],
+        "wins": 7,
+        "losses": 5,
+        "longestRun": 4,
+        "text": "7–5"
+      }
+    },
+    {
+      "name": "ties count for you, even weeks with nothing on either side",
+      "input": {
+        "timeZone": "America/New_York",
+        "now": 1794841200,
+        "local": "2026-11-16T10:00-05:00",
+        "you": { "2026-08-24": 0, "2026-10-14": 3 },
+        "them": { "2026-08-24": 0, "2026-10-15": 3 }
+      },
+      "expected": {
+        "weeks": ["win", "win", "win", "win", "win", "win", "win", "win", "win", "win", "win", "win"],
+        "wins": 12,
+        "losses": 0,
+        "longestRun": 12,
+        "text": "12–0"
+      }
+    },
+    {
+      "name": "their calendar starts on a Wednesday: that week and every earlier one is empty",
+      "input": {
+        "timeZone": "America/New_York",
+        "now": 1794841200,
+        "local": "2026-11-16T10:00-05:00",
+        "you": { "2026-08-01": 0, "2026-10-13": 1, "2026-10-20": 1, "2026-10-27": 6, "2026-11-03": 2, "2026-11-10": 5 },
+        "them": { "2026-10-14": 4, "2026-10-22": 3, "2026-10-28": 6, "2026-11-05": 1, "2026-11-12": 2 }
+      },
+      "expected": {
+        "weeks": ["none", "none", "none", "none", "none", "none", "none", "none", "loss", "win", "win", "win"],
+        "wins": 3,
+        "losses": 1,
+        "longestRun": 3,
+        "text": "3–1"
+      }
+    },
+    {
+      "name": "their calendar starts on a Monday: that week counts",
+      "input": {
+        "timeZone": "America/New_York",
+        "now": 1794841200,
+        "local": "2026-11-16T10:00-05:00",
+        "you": { "2026-08-01": 0, "2026-10-18": 1, "2026-10-26": 1, "2026-11-09": 7 },
+        "them": { "2026-10-12": 2, "2026-11-02": 4, "2026-11-09": 7 }
+      },
+      "expected": {
+        "weeks": ["none", "none", "none", "none", "none", "none", "none", "loss", "win", "win", "loss", "win"],
+        "wins": 3,
+        "losses": 2,
+        "longestRun": 2,
+        "text": "3–2"
+      }
+    },
+    {
+      "name": "your calendar starts on a Sunday: that week is empty, whatever they did in it",
+      "input": {
+        "timeZone": "America/New_York",
+        "now": 1794841200,
+        "local": "2026-11-16T10:00-05:00",
+        "you": { "2026-10-18": 1 },
+        "them": { "2026-08-01": 0, "2026-10-13": 9, "2026-10-20": 2 }
+      },
+      "expected": {
+        "weeks": ["none", "none", "none", "none", "none", "none", "none", "none", "loss", "win", "win", "win"],
+        "wins": 3,
+        "losses": 1,
+        "longestRun": 3,
+        "text": "3–1"
+      }
+    },
+    {
+      "name": "no finished week for both of you yet: no record",
+      "input": {
+        "timeZone": "America/New_York",
+        "now": 1794841200,
+        "local": "2026-11-16T10:00-05:00",
+        "you": { "2026-08-01": 0, "2026-11-10": 3 },
+        "them": { "2026-11-10": 5, "2026-11-16": 2 }
+      },
+      "expected": null
+    },
+    {
+      "name": "weeks before the last 12 don't extend the run",
+      "input": {
+        "timeZone": "America/New_York",
+        "now": 1794841200,
+        "local": "2026-11-16T10:00-05:00",
+        "you": { "2026-08-01": 0, "2026-08-18": 5, "2026-08-25": 1, "2026-09-01": 1 },
+        "them": {
+          "2026-08-01": 0, "2026-09-09": 1, "2026-09-14": 1, "2026-09-21": 1, "2026-09-28": 1, "2026-10-05": 1,
+          "2026-10-12": 1, "2026-10-19": 1, "2026-10-26": 1, "2026-11-02": 1, "2026-11-09": 1
+        }
+      },
+      "expected": {
+        "weeks": ["win", "win", "loss", "loss", "loss", "loss", "loss", "loss", "loss", "loss", "loss", "loss"],
+        "wins": 2,
+        "losses": 10,
+        "longestRun": 2,
+        "text": "2–10"
+      }
+    },
+    {
+      "name": "still Sunday in Los Angeles: this week isn't finished, so its Sunday doesn't count",
+      "input": {
+        "timeZone": "America/Los_Angeles",
+        "now": 1794805200,
+        "local": "2026-11-15T21:00-08:00",
+        "you": { "2026-08-01": 0, "2026-11-02": 1 },
+        "them": { "2026-08-01": 0, "2026-11-08": 2, "2026-11-15": 9 }
+      },
+      "expected": {
+        "weeks": ["win", "win", "win", "win", "win", "win", "win", "win", "win", "win", "win", "loss"],
+        "wins": 11,
+        "losses": 1,
+        "longestRun": 11,
+        "text": "11–1"
+      }
+    },
+    {
+      "name": "already Monday in Auckland: the week just ended is the newest square",
+      "input": {
+        "timeZone": "Pacific/Auckland",
+        "now": 1794744000,
+        "local": "2026-11-16T01:00+13:00",
+        "you": { "2026-08-01": 0, "2026-11-02": 1 },
+        "them": { "2026-08-01": 0, "2026-11-08": 2, "2026-11-15": 9 }
+      },
+      "expected": {
+        "weeks": ["win", "win", "win", "win", "win", "win", "win", "win", "win", "win", "loss", "loss"],
+        "wins": 10,
+        "losses": 2,
+        "longestRun": 10,
+        "text": "10–2"
+      }
+    }
+  ],
+  "records": []
+}

@@ -93,6 +93,15 @@ enum ScreenshotFixture {
         return InMemoryLiveRankPreferences(LiveRankPreferences(isEnabled: true, relayDisclosureAccepted: true))
     }
 
+    /// `-ScreenshotCalendarFrom <login>=<YYYY-MM-DD>`: once the board loads, that person's calendar
+    /// starts on that day, as a new GitHub account's would, so their Weekly record has empty weeks.
+    /// The next refresh restores it.
+    static var calendarStart: (login: String, first: String)? {
+        guard let parts = value(after: "-ScreenshotCalendarFrom")?.split(separator: "="), parts.count == 2
+        else { return nil }
+        return (String(parts[0]), String(parts[1]))
+    }
+
     private static func value(after flag: String) -> String? {
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) else { return nil }
@@ -224,6 +233,10 @@ enum ScreenshotFixture {
             // Two refreshes on the same day: the first sets today's baseline, the second moves.
             await services.refresh.refreshAll(reason: .manual)
             await services.refresh.refreshAll(reason: .timer)
+            if let start = calendarStart, var history = services.store.history(for: start.login) {
+                history.days = history.days.filter { $0.key >= start.first }
+                services.store.updateHistories([start.login: history])
+            }
         }
         return services
     }
