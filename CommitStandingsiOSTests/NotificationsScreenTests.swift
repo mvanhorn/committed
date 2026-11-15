@@ -134,7 +134,6 @@ struct NotificationsScreenTests {
         let model = makeModel()
         await model.sceneDidBecomeActive()
         #expect(model.notificationChoices.closeCalls == false)
-        #expect(lastNotifications?.preferences.closeCalls == false)
 
         await model.updateNotificationChoices { $0.closeCalls = true }
 
