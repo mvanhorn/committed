@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The Board tab: your summary, then everyone ranked with the shared `StandingRow`. The Window
-/// switch sits in the navigation bar; pull to refresh reloads people and Contributions.
+/// The Board tab: on a day you set a record, its card (`BoardRecordCard`); your summary, then
+/// everyone ranked with the shared `StandingRow`. The Window switch sits in the navigation bar;
+/// pull to refresh reloads people and Contributions.
 ///
 /// Two panes in a split arrangement: the leaderboard is primary, so it's the pane that survives
 /// when there's room for only one, and your summary is secondary. Side by side they divide the
@@ -156,6 +157,17 @@ struct BoardLeaderboard: View {
         let rivals = YourRivals.rows(ranked: entries, store: store)
 
         List {
+            // A record you set today, first thing on the Board, under the Window switch's bar.
+            if let record = model.recordCard {
+                Section {
+                    BoardRecordCard(record: record)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+                        .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                }
+            }
+
             if summaryPlacement == .leaderboardHeader {
                 Section {
                     BoardSummaryView()

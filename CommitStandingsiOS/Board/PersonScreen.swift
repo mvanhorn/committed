@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// The person view on iPhone: the shared `PersonViewContent` in the app's materials, scrolling on
-/// ink, with the iPhone's private-contributions tip on your own view and Challenge under Your race
-/// on someone else's. `BoardView` pushes it onto
+/// ink: on your own view, Your records under the stats and the iPhone's private-contributions tip;
+/// on someone else's, Challenge under Your race. `BoardView` pushes it onto
 /// the Board, or shows it in the second pane on iPhone Duo when the panes sit side by side.
 ///
 /// Wherever it's wider than tall and has room for two readable columns (the closed iPhone Duo or
@@ -14,6 +14,8 @@ import SwiftUI
 struct PersonScreen: View {
     @Environment(AppModel.self) private var model
     let person: PersonSummary
+    /// Your records, drawn under the stats on your own view only.
+    var records: PersonalRecords?
     /// Off in the Board's second pane, which is already one half of the Board.
     var allowsColumns = true
     @State private var size: CGSize = .zero
@@ -53,6 +55,10 @@ struct PersonScreen: View {
                 // Hidden on the Sample board and until the race loads.
                 if let challenge = model.challenge(for: person) {
                     ChallengeButton(challenge: challenge, person: person)
+                }
+            } underStats: {
+                if person.isYou, let records {
+                    YourRecordsSection(records: records)
                 }
             }
             .padding(16)
@@ -160,7 +166,7 @@ struct PersonDestination: View {
     var body: some View {
         Group {
             if let person = model.shownPerson {
-                PersonScreen(person: person)
+                PersonScreen(person: person, records: person.isYou ? model.yourRecords : nil)
                     .navigationTitle(person.isYou ? "Your month" : "\(person.login)’s month")
                     .toolbar {
                         if !person.isYou {
@@ -210,7 +216,7 @@ struct PersonPane: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            PersonScreen(person: person, allowsColumns: false)
+            PersonScreen(person: person, records: person.isYou ? model.yourRecords : nil, allowsColumns: false)
         }
         .background(Color.ink)
         .accessibilityElement(children: .contain)

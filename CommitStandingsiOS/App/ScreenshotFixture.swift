@@ -20,6 +20,8 @@ import UIKit
 /// (`-ScreenshotPersonEnd` scrolls it to the end), `-ScreenshotChallenge <login>` opens that person's
 /// view and their Challenge share once their race loads (as a notification's Share your race will),
 /// `-ScreenshotTroll <login>` gives that person a trolling day (784 more, the troll face),
+/// `-ScreenshotRecordDay <n>` makes your count today n (a big one sets a record: the record card
+/// and New tiles in Your records; `-ScreenshotShareRecord` then taps the card's Share), `-ScreenshotHide` takes several logins separated by commas,
 /// `-ScreenshotCountScale <n>` multiplies everyone's counts by n (30 puts every 30-day count in
 /// the thousands beside the streaks, the board's widest rows), and
 /// `-LiveRankPayload <file.json>` shows a Live Activity push payload's content state in Live rank,
@@ -83,6 +85,12 @@ enum ScreenshotFixture {
     /// Debug launch.
     static var opensShare: Bool {
         ProcessInfo.processInfo.arguments.contains("-ScreenshotShare")
+    }
+
+    /// `-ScreenshotShareRecord`: tap the record card's Share a few seconds after launch, once the
+    /// board has loaded, so captures can show the share sheet with the card's image.
+    static var sharesRecord: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotShareRecord")
     }
 
     /// `-ScreenshotRivalLimit`: a person view's Rival explains the limit on appear when three rivals
@@ -209,9 +217,10 @@ enum ScreenshotFixture {
             includesFailingCompetitor: failingCompetitor,
             restrictedOrganizations: value(after: "-ScreenshotRestrictedOrg").map { [$0] },
             trollPerson: value(after: "-ScreenshotTroll"),
-            countScale: value(after: "-ScreenshotCountScale").flatMap(Int.init).map { max(1, $0) } ?? 1
+            countScale: value(after: "-ScreenshotCountScale").flatMap(Int.init).map { max(1, $0) } ?? 1,
+            recordDay: value(after: "-ScreenshotRecordDay").flatMap(Int.init)
         ), now: now)
-        let hide = value(after: "-ScreenshotHide")
+        let hide = value(after: "-ScreenshotHide")?.split(separator: ",").map(String.init)
         let pins = value(after: "-ScreenshotPin")?.split(separator: ",").map(String.init) ?? []
         // `-ScreenshotWindow monthly`: the board opens on that Window (a raw value).
         if let window = value(after: "-ScreenshotWindow").flatMap(ContributionWindow.init(rawValue:)) {
@@ -222,8 +231,8 @@ enum ScreenshotFixture {
             if hide != nil || !pins.isEmpty {
                 await services.roster.refresh(force: true)
             }
-            if let hide {
-                services.store.setHidden(true, username: hide)
+            for login in hide ?? [] {
+                services.store.setHidden(true, username: login)
             }
             for login in pins {
                 services.store.setPinned(true, username: login)

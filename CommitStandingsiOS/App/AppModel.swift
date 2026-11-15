@@ -81,6 +81,13 @@ final class AppModel {
 
     /// Where the Sample board is remembered across launches (UserDefaults).
     nonisolated static let sampleBoardKey = "sampleBoard.v1"
+    /// Where dismissed record cards are remembered (UserDefaults), by GitHub account.
+    nonisolated static let dismissedRecordCardsKey = "recordCards.dismissed.v1"
+
+    /// Record cards dismissed on the real board, by GitHub account, newest last (`dismissRecordCard`).
+    private var dismissedRecordCards: [String: [String]]
+    /// The Sample board's, forgotten when it ends.
+    private var sampleDismissedRecordCards: [String: [String]] = [:]
 
     /// `services` is the real graph. `defaults` remembers the Sample board across launches; nil
     /// keeps it in memory (tests, previews, the screenshot fixture). The Live rank defaults never
@@ -103,6 +110,7 @@ final class AppModel {
         self.realServices = services
         self.makeSampleServices = sampleServices
         self.defaults = defaults
+        self.dismissedRecordCards = defaults?.dictionary(forKey: Self.dismissedRecordCardsKey) as? [String: [String]] ?? [:]
         self.liveRankActivities = liveRankActivities
         self.backgroundTime = backgroundTime
         self.widgets = widgets
@@ -205,6 +213,7 @@ final class AppModel {
         realServices.refresh.pauseTimer()
         services = sample
         selectedPerson = nil
+        sampleDismissedRecordCards = [:]
         liveRank = sampleLiveRank
         didRefreshIdentity = false
     }
@@ -408,6 +417,45 @@ final class AppModel {
     /// (hidden, or gone from your people), which closes it.
     var shownPerson: PersonSummary? {
         selectedPerson.flatMap { store.person($0, asOf: now(), calendar: .current) }
+    }
+
+    // MARK: - Your records
+
+    /// Your records as of now, against the people on the board: nil until your calendar loads.
+    var yourRecords: PersonalRecords? {
+        store.records(asOf: now())
+    }
+
+    /// The Board's record card: a record you broke today that's worth celebrating and that you
+    /// haven't dismissed. It goes by itself when the day ends.
+    var recordCard: PersonalRecords.Broken? {
+        guard let me = store.selfCompetitor?.username else { return nil }
+        return yourRecords?.card(dismissed: Set(dismissed(for: me)))
+    }
+
+    /// Hides the record card for this record, on this account. Saved on the real board; the Sample
+    /// board's are forgotten when it ends.
+    func dismissRecordCard(_ record: PersonalRecords.Broken) {
+        guard let me = store.selfCompetitor?.username else { return }
+        // A card lasts a day, so a few recent ids are all that's ever needed.
+        let kept = Array((dismissed(for: me).filter { $0 != record.id } + [record.id]).suffix(12))
+        if mode == .sampleBoard {
+            sampleDismissedRecordCards[me] = kept
+        } else {
+            dismissedRecordCards[me] = kept
+            defaults?.set(dismissedRecordCards, forKey: Self.dismissedRecordCardsKey)
+        }
+    }
+
+    private func dismissed(for login: String) -> [String] {
+        (mode == .sampleBoard ? sampleDismissedRecordCards : dismissedRecordCards)[login] ?? []
+    }
+
+    /// See your records: your own view, on the Board.
+    func showYourRecords() {
+        guard let me = store.selfCompetitor?.username else { return }
+        selectedTab = .board
+        showPerson(me)
     }
 
     /// Hiding or showing someone updates Live rank and the widgets right away while the app is open.

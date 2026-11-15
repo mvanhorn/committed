@@ -247,7 +247,7 @@ extension WidgetSnapshot {
 }
 
 /// Committed and how many people are on the board, then where to get it.
-private struct BoardShareFooter: View {
+struct BoardShareFooter: View {
     let peopleCount: Int
 
     var body: some View {

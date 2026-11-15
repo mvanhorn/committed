@@ -61,12 +61,15 @@ extension EnvironmentValues {
 /// own controls right under the race card (`raceAccessory`: the iPhone's Challenge); the Mac puts
 /// none.
 ///
-/// The host scrolls it and sets its width; this view has no platform-only types.
-struct PersonViewContent<Tip: View, RaceAccessory: View>: View {
+/// The host scrolls it and sets its width; this view has no platform-only types. A host can add a
+/// section under the stats (`underStats`): the iPhone puts Your records there on your own view.
+/// The Mac adds nothing.
+struct PersonViewContent<Tip: View, RaceAccessory: View, UnderStats: View>: View {
     let person: PersonSummary
     private let part: PersonViewPart
     private let privateTip: Tip
     private let raceAccessory: RaceAccessory
+    private let underStats: UnderStats
     @Environment(\.personViewStyle) private var style
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// The selected bar's day of the month: today until another is picked.
@@ -74,11 +77,13 @@ struct PersonViewContent<Tip: View, RaceAccessory: View>: View {
     @State private var touchedBar: String?
 
     init(person: PersonSummary, initialDay: Int? = nil, part: PersonViewPart = .all,
-         @ViewBuilder privateTip: () -> Tip, @ViewBuilder raceAccessory: () -> RaceAccessory) {
+         @ViewBuilder privateTip: () -> Tip, @ViewBuilder raceAccessory: () -> RaceAccessory,
+         @ViewBuilder underStats: () -> UnderStats) {
         self.person = person
         self.part = part
         self.privateTip = privateTip()
         self.raceAccessory = raceAccessory()
+        self.underStats = underStats()
         _selectedDay = State(initialValue: initialDay ?? person.dayOfMonth)
     }
 
@@ -106,6 +111,7 @@ struct PersonViewContent<Tip: View, RaceAccessory: View>: View {
                         raceAccessory
                     }
                     stats(days)
+                    underStats
                 }
                 if part.month {
                     month(days)
@@ -561,15 +567,16 @@ private struct DayBar: Identifiable {
     }
 }
 
-extension PersonViewContent where RaceAccessory == EmptyView {
-    /// The person view with nothing under the race card.
+extension PersonViewContent where RaceAccessory == EmptyView, UnderStats == EmptyView {
+    /// The person view with nothing added under the race card or the stats.
     init(person: PersonSummary, initialDay: Int? = nil, part: PersonViewPart = .all,
          @ViewBuilder privateTip: () -> Tip) {
-        self.init(person: person, initialDay: initialDay, part: part, privateTip: privateTip) { EmptyView() }
+        self.init(person: person, initialDay: initialDay, part: part, privateTip: privateTip,
+                  raceAccessory: { EmptyView() }, underStats: { EmptyView() })
     }
 }
 
-extension PersonViewContent where Tip == PrivateContributionsTip, RaceAccessory == EmptyView {
+extension PersonViewContent where Tip == PrivateContributionsTip, RaceAccessory == EmptyView, UnderStats == EmptyView {
     /// The person view with the Mac's private-contributions tip, always shown on your own view.
     init(person: PersonSummary, initialDay: Int? = nil, part: PersonViewPart = .all) {
         self.init(person: person, initialDay: initialDay, part: part) {
