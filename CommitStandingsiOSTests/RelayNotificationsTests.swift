@@ -285,6 +285,10 @@ struct RelayNotificationsTests {
 
     private let pass: [AnyHashable: Any] = ["kind": "pass", "login": "Ada", "aps": ["category": "PASS"]]
 
+    @Test func aBodyTapIsWhatIOSCallsTheDefaultAction() {
+        #expect(DeepLink.bodyTapAction == UNNotificationDefaultActionIdentifier)
+    }
+
     @Test func eachPassActionHasItsOwnDestination() {
         // What iOS hands the app: the system's identifier for a body tap, or the action's.
         #expect(DeepLink(notification: pass, action: "com.apple.UNNotificationDefaultActionIdentifier")

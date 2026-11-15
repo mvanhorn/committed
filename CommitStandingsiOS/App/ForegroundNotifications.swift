@@ -50,14 +50,19 @@ final class ForegroundNotificationPresenter: NSObject, UNUserNotificationCenterD
     func userNotificationCenter(
         _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
     ) async {
-        guard let link = DeepLink(notification: response.notification.request.content.userInfo,
-                                  action: response.actionIdentifier) else { return }
-        await MainActor.run {
-            if let open = Self.open {
-                open(link)
-            } else {
-                Self.pendingLink = link
-            }
+        let userInfo = response.notification.request.content.userInfo
+        guard let link = DeepLink(notification: userInfo, action: response.actionIdentifier) else { return }
+        await MainActor.run { Self.receive(link) }
+    }
+
+    /// Opens `link` now, or once the app attaches `open` (a cold launch). Debug screenshot
+    /// launches feed a pass response through here too (`ScreenshotFixture.notificationResponse`).
+    @MainActor
+    static func receive(_ link: DeepLink) {
+        if let open {
+            open(link)
+        } else {
+            pendingLink = link
         }
     }
 }
