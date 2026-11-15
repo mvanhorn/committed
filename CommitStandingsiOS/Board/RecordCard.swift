@@ -130,7 +130,7 @@ struct BoardRecordCard: View {
         ))
         // The image alone, as Share board sends it.
         .sheet(item: $sharing) { file in
-            BoardShareActivity(url: file.url)
+            ShareActivity(items: [file.url])
                 .presentationDetents([.medium, .large])
                 .ignoresSafeArea()
         }

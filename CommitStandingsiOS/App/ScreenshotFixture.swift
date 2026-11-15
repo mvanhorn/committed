@@ -17,8 +17,11 @@ import UIKit
 /// board has loaded,
 /// `-ScreenshotPerson <login>` opens that person's view (pushed onto the Board, or the second pane on the open
 /// iPhone Duo) and `-ScreenshotPersonDay <n>` selects that day's bar instead of today's
-/// (`-ScreenshotPersonEnd` scrolls it to the end),
+/// (`-ScreenshotPersonEnd` scrolls it to the end), `-ScreenshotChallenge <login>` opens that person's
+/// view and their Challenge share once their race loads (as a notification's Share your race will),
 /// `-ScreenshotTroll <login>` gives that person a trolling day (784 more, the troll face),
+/// `-ScreenshotCalendarFrom <login>=<YYYY-MM-DD>` starts that person's calendar on that day once the
+/// board loads (empty weeks in their Weekly record),
 /// `-ScreenshotRecordDay <n>` makes your count today n (a big one sets a record: the record card
 /// and New tiles in Your records; `-ScreenshotShareRecord` then taps the card's Share), `-ScreenshotHide` takes several logins separated by commas,
 /// `-ScreenshotCountScale <n>` multiplies everyone's counts by n (30 puts every 30-day count in
@@ -57,6 +60,12 @@ enum ScreenshotFixture {
     /// `-ScreenshotPerson <login>`: the person view to open on launch, as a tap on their row would.
     static var requestedPerson: String? {
         value(after: "-ScreenshotPerson")
+    }
+
+    /// `-ScreenshotChallenge <login>`: opens that person's view and presents their Challenge share
+    /// once their race has loaded, through `AppModel.requestChallenge`.
+    static var requestedChallenge: String? {
+        value(after: "-ScreenshotChallenge")
     }
 
     /// `-ScreenshotPersonDay <n>`: the person view's selected bar, instead of today's.
@@ -145,6 +154,15 @@ enum ScreenshotFixture {
         return InMemoryLiveRankPreferences(LiveRankPreferences(
             isEnabled: true, relayDisclosureAccepted: true, relayNotifications: notifications
         ))
+    }
+
+    /// `-ScreenshotCalendarFrom <login>=<YYYY-MM-DD>`: once the board loads, that person's calendar
+    /// starts on that day, as a new GitHub account's would, so their Weekly record has empty weeks.
+    /// The next refresh restores it.
+    static var calendarStart: (login: String, first: String)? {
+        guard let parts = value(after: "-ScreenshotCalendarFrom")?.split(separator: "="), parts.count == 2
+        else { return nil }
+        return (String(parts[0]), String(parts[1]))
     }
 
     private static func value(after flag: String) -> String? {
@@ -279,6 +297,10 @@ enum ScreenshotFixture {
             // Two refreshes on the same day: the first sets today's baseline, the second moves.
             await services.refresh.refreshAll(reason: .manual)
             await services.refresh.refreshAll(reason: .timer)
+            if let start = calendarStart, var history = services.store.history(for: start.login) {
+                history.days = history.days.filter { $0.key >= start.first }
+                services.store.updateHistories([start.login: history])
+            }
         }
         return services
     }

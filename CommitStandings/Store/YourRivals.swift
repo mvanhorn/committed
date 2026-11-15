@@ -2,18 +2,22 @@ import Foundation
 
 /// Your rivals on the iPhone Board: your pinned rivals' rows, taken from the Window's ranking
 /// (`Ranking.order`, as the list under them uses), so a rival's rank always matches their row in
-/// Everyone. Each has the gap in the Board's words: "3 to pass", "12 ahead", "Level".
+/// Everyone. Each has the gap in the Board's words: "3 to pass", "12 ahead", "Level", and your
+/// weekly record against them ("7–5", `RivalryRecord`) in the streak's place.
 enum YourRivals {
     struct Row: Identifiable, Equatable {
         let entry: Ranking.Entry
         /// "3 to pass", "12 ahead" or "Level"; nil until both counts have loaded.
         let gap: String?
+        /// Your weekly record against them; nil until you both have a finished week.
+        var record: RivalryRecord? = nil
         var id: UUID { entry.id }
     }
 
-    /// The pinned rivals among `ranked` (the selected Window's board), in board order.
+    /// The pinned rivals among `ranked` (the selected Window's board), in board order, with your
+    /// records as of `reference` (the app's clock, as the person view uses).
     @MainActor
-    static func rows(ranked: [Ranking.Entry], store: StandingsStore) -> [Row] {
+    static func rows(ranked: [Ranking.Entry], store: StandingsStore, asOf reference: Date = .now) -> [Row] {
         let pinned = Set(store.pinnedRivals.map(\.username))
         guard !pinned.isEmpty else { return [] }
         let window = store.selectedWindow
@@ -24,7 +28,8 @@ enum YourRivals {
         }
         let yours = loaded(store.selfCompetitor?.username)
         return ranked.filter { pinned.contains($0.competitor.username) }.map { entry in
-            Row(entry: entry, gap: gapLine(yours: yours, theirs: loaded(entry.competitor.username)))
+            Row(entry: entry, gap: gapLine(yours: yours, theirs: loaded(entry.competitor.username)),
+                record: store.rivalry(with: entry.competitor.username, asOf: reference))
         }
     }
 

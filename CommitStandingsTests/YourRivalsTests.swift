@@ -82,6 +82,38 @@ struct YourRivalsTests {
         #expect(level.accessibilityDescription == "rank 4, bram-ott, 7 contributions for today, level")
     }
 
+    /// A rival's row carries your weekly record against them, from both calendars, as of the
+    /// date the Board passes (the app's clock); nil until you both have a finished week.
+    @Test func rowsCarryYourWeeklyRecord() {
+        let store = board(["me": 3, "ada": 5, "bo": 1])
+        let utc = TimeZone.gmt
+        store.updateHistories([
+            // Monday November 2 through Wednesday November 18: two finished weeks.
+            "me": ContributionHistory(days: ["2026-11-02": 4, "2026-11-09": 1, "2026-11-18": 3], timeZone: utc),
+            "ada": ContributionHistory(days: ["2026-11-02": 0, "2026-11-10": 2], timeZone: utc),
+            // Bo's calendar starts this week: no finished week yet.
+            "bo": ContributionHistory(days: ["2026-11-16": 1], timeZone: utc),
+        ])
+        store.setPinned(true, username: "ada")
+        store.setPinned(true, username: "bo")
+        let today = Date(timeIntervalSince1970: 1_795_003_200) // Wednesday November 18, noon UTC
+        let rows = YourRivals.rows(ranked: ranked(store), store: store, asOf: today)
+        #expect(rows.map(\.entry.competitor.username) == ["ada", "bo"])
+        #expect(rows.map { $0.record?.text } == ["1–1", nil])
+        #expect(rows.first?.record?.spoken(against: "ada") == "You’ve won 1 of the last 2 weeks against ada")
+    }
+
+    /// The record takes the streak's place, and VoiceOver reads it as a sentence there.
+    @Test func voiceOverReadsTheRecordOnARivalsRow() {
+        let row = StandingRow(rank: 2, competitor: Competitor(username: "ezra-q", isSelf: false),
+                              standing: Standing(username: "ezra-q", contributions: 9, window: .daily,
+                                                 lastUpdated: .now, state: .loaded),
+                              window: .daily, streak: 12, caption: "2 to pass", record: "7–5",
+                              recordSpoken: "You’ve won 7 of the last 12 weeks against ezra-q")
+        #expect(row.accessibilityDescription
+                == "rank 2, ezra-q, 9 contributions for today, 2 to pass, you’ve won 7 of the last 12 weeks against ezra-q")
+    }
+
     @Test func everyoneHeaderCountsThePeopleOnTheBoard() {
         #expect(YourRivals.everyoneHeader(count: 5) == "Everyone · 5 people")
         #expect(YourRivals.everyoneHeader(count: 1) == "Everyone · 1 person")

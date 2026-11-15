@@ -41,6 +41,7 @@ struct CommittedApp: App {
             )
             if let tab = ScreenshotFixture.requestedTab { model.selectedTab = tab }
             model.selectedPerson = ScreenshotFixture.requestedPerson
+            if let login = ScreenshotFixture.requestedChallenge { model.requestChallenge(login) }
             return model
         }
         #endif

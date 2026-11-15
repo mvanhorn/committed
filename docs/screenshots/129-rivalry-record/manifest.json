@@ -1,0 +1,39 @@
+{
+  "device": "iPhone Duo Simulator (closed, outer display, portrait)",
+  "os": "iOS 27.1",
+  "notes": "Ticket #129 (spec #124). Runtime captures of the Debug app on the shared iPhone Duo (94D56458-…) with the screenshot fixture (Sample board data): -ScreenshotFixture -ScreenshotDate 2026-11-16T17:00:00Z (a Monday, so last week is November 9–15), plus -ScreenshotPin / -ScreenshotPerson per capture. Empty and missing records use the new -ScreenshotCalendarFrom <login>=<YYYY-MM-DD> flag, which trims that person's Sample calendar after the board loads, as a new GitHub account's calendar would start; their race card and month bars use the same trimmed calendar. Mac unchanged: the Weekly record is behind #if os(iOS). Not captured: the open iPhone Duo's second pane (PersonPane), which can't be opened headlessly here; VoiceOver readings are unit-tested (YourRivalsTests, PersonSummaryTests), not captured. No baseline capture: before this change the person view went from the race card straight to the Streak tiles (as person-no-weekly-record.png still does) and Your rivals rows showed the streak (see docs/screenshots/125-pin-rivals). Captured after merging #127 into this branch: no record card shows at this fixture date (no -ScreenshotRecordDay).",
+  "screenshots": [
+    {
+      "file": "board-your-rivals-record.png",
+      "caption": "Board, Today, odile-m and ezra-q pinned: Your rivals rows show the weekly record (\"2–10\", \"7–5\") in place of the streak, with rank and the gap; the Everyone list keeps streaks",
+      "capture": {
+        "sourceCommit": "ccb5e851caba3db653aa801bcff7c77de28fc281",
+        "fixture": true
+      }
+    },
+    {
+      "file": "person-weekly-record.png",
+      "caption": "odile-m's view: Weekly record under Your race, \"2–10\" with your wins in lime, 12 squares (lime your win, dim theirs), \"Longest run: 1 week\"",
+      "capture": {
+        "sourceCommit": "ccb5e851caba3db653aa801bcff7c77de28fc281",
+        "fixture": true
+      }
+    },
+    {
+      "file": "person-weekly-record-new-calendar.png",
+      "caption": "ezra-q's view with their calendar starting Wednesday September 30: the 6 weeks before it are empty outlines, \"3–3\", \"Longest run: 3 weeks in a row\"",
+      "capture": {
+        "sourceCommit": "ccb5e851caba3db653aa801bcff7c77de28fc281",
+        "fixture": true
+      }
+    },
+    {
+      "file": "person-no-weekly-record.png",
+      "caption": "bram-ott's view with their calendar starting Wednesday November 11: no finished week for both of you yet, so no Weekly record; the Streak tiles follow the race card",
+      "capture": {
+        "sourceCommit": "ccb5e851caba3db653aa801bcff7c77de28fc281",
+        "fixture": true
+      }
+    }
+  ]
+}

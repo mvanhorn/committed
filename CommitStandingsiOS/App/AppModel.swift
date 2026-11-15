@@ -37,8 +37,11 @@ final class AppModel {
 
     var selectedTab: AppTab = .board
     /// The Competitor whose person view is open (pushed onto the Board, or the second pane on iPhone Duo), by
-    /// login; nil when none is. Forgotten when the graph on screen changes.
-    var selectedPerson: String?
+    /// login; nil when none is. Forgotten when the graph on screen changes. Closing it, or showing
+    /// someone else, drops a Challenge asked for them.
+    var selectedPerson: String? {
+        didSet { if selectedPerson != requestedChallenge { requestedChallenge = nil } }
+    }
     /// The switch in Settings asked for the relay disclosure.
     private var liveRankDisclosureRequested = false
     /// The Passes switch asked for the relay notifications sheet.
@@ -530,10 +533,46 @@ final class AppModel {
         selectedPerson = login
     }
 
+    // MARK: - Challenge
+
+    /// Someone whose Challenge share should open by itself once their race has loaded: asked for
+    /// from outside the person view (a pass notification's Share your race, #137).
+    private(set) var requestedChallenge: String?
+
+    /// Challenge for `person`'s view: your 30-day race with them. nil on your own view, until both
+    /// your counts have loaded, and on the Sample board, whose people are made up.
+    func challenge(for person: PersonSummary) -> Challenge? {
+        guard mode == .connected, let you = store.selfCompetitor?.username else { return nil }
+        return Challenge(you: you, person: person)
+    }
+
+    /// Opens `login`'s view on the Board and presents their Challenge share as soon as their race
+    /// has loaded, as tapping Challenge would. Nothing opens on the Sample board.
+    func requestChallenge(_ login: String) {
+        selectedTab = .board
+        showPerson(login)
+        requestedChallenge = mode == .connected ? login : nil
+    }
+
+    /// The Challenge asked for with `requestChallenge`, once, when `person` is the one asked for
+    /// and their race has loaded; nil until then.
+    func takeRequestedChallenge(for person: PersonSummary) -> Challenge? {
+        guard requestedChallenge == person.login, selectedPerson == person.login,
+              let challenge = challenge(for: person) else { return nil }
+        requestedChallenge = nil
+        return challenge
+    }
+
     /// The open person view's content as of now, or nil: nobody chosen, or they've left the board
     /// (hidden, or gone from your people), which closes it.
     var shownPerson: PersonSummary? {
         selectedPerson.flatMap { store.person($0, asOf: now(), calendar: .current) }
+    }
+
+    /// Your rivals on the Board, from `ranked` (the selected Window's board), with your weekly
+    /// records as of the app's clock, the same date the person view uses.
+    func yourRivals(ranked: [Ranking.Entry]) -> [YourRivals.Row] {
+        YourRivals.rows(ranked: ranked, store: store, asOf: now())
     }
 
     // MARK: - Your records

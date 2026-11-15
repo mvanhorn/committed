@@ -18,6 +18,9 @@ struct StandingRow: View {
     var caption: String? = nil
     /// Shown in place of the streak: a rivalry record ("7–5") on Your rivals. nil ⇒ the streak.
     var record: String? = nil
+    /// How VoiceOver reads `record`: "You've won 7 of the last 12 weeks against ezra-q". nil ⇒
+    /// "record 7–5".
+    var recordSpoken: String? = nil
     /// Grows with Dynamic Type on iPhone so "#12" never truncates; stays 24pt on the Mac.
     @ScaledMetric(relativeTo: .caption) private var rankWidth: CGFloat = 24
     /// iPhone at accessibility text sizes wraps long usernames instead of truncating them.
@@ -236,7 +239,9 @@ struct StandingRow: View {
             delta == 0 ? "" : ", \(delta > 0 ? "up" : "down") \(delta.magnitude) \(delta.magnitude == 1 ? "place" : "places") today"
         } ?? ""
         // A record (Your rivals) is read in the streak's place, as it's drawn there.
-        let streakOrRecord = record.map { ", record \($0)" }
+        let streakOrRecord = record.map { record in
+            ", " + (recordSpoken.map { $0.prefix(1).lowercased() + $0.dropFirst() } ?? "record \(record)")
+        }
             ?? (hasData ? StreakLabel.spoken(streak).map { ", " + $0 } ?? "" : "")
         let trolling = trollDescription.map { ", trolling: \($0)" } ?? ""
         let gap = caption.map { ", " + $0.lowercased() } ?? ""
