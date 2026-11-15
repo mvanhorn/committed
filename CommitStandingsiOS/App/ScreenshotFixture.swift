@@ -9,6 +9,9 @@ import UIKit
 ///
 /// Optional, after `-ScreenshotFixture`: `-ScreenshotTab people|settings` opens on that tab,
 /// `-ScreenshotHide <login>` hides that person before the first refresh (so Today still moves),
+/// `-ScreenshotPin <login,login>` pins those people as rivals (Your rivals on the Board),
+/// `-ScreenshotRivalLimit` shows Rival's "You can pin up to 3 rivals" on a person view opened with
+/// three rivals already pinned, as a tap would,
 /// `-ScreenshotWindow <raw value>` opens the board on that Window (`monthly` for 30 days),
 /// `-ScreenshotDate <ISO 8601>` sets the app's clock, `-ScreenshotShare` opens Share board once the
 /// board has loaded,
@@ -16,6 +19,8 @@ import UIKit
 /// iPhone Duo) and `-ScreenshotPersonDay <n>` selects that day's bar instead of today's
 /// (`-ScreenshotPersonEnd` scrolls it to the end),
 /// `-ScreenshotTroll <login>` gives that person a trolling day (784 more, the troll face),
+/// `-ScreenshotRecordDay <n>` makes your count today n (a big one sets a record: the record card
+/// and New tiles in Your records; `-ScreenshotShareRecord` then taps the card's Share), `-ScreenshotHide` takes several logins separated by commas,
 /// `-ScreenshotCountScale <n>` multiplies everyone's counts by n (30 puts every 30-day count in
 /// the thousands beside the streaks, the board's widest rows), and
 /// `-LiveRankPayload <file.json>` shows a Live Activity push payload's content state in Live rank,
@@ -79,6 +84,18 @@ enum ScreenshotFixture {
     /// Debug launch.
     static var opensShare: Bool {
         ProcessInfo.processInfo.arguments.contains("-ScreenshotShare")
+    }
+
+    /// `-ScreenshotShareRecord`: tap the record card's Share a few seconds after launch, once the
+    /// board has loaded, so captures can show the share sheet with the card's image.
+    static var sharesRecord: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotShareRecord")
+    }
+
+    /// `-ScreenshotRivalLimit`: a person view's Rival explains the limit on appear when three rivals
+    /// are pinned, as tapping it would. Honored on any Debug launch.
+    static var explainsRivalLimit: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotRivalLimit")
     }
 
     /// Live rank settings for the fixture, in memory: never chosen, or accepted and on with
@@ -192,7 +209,8 @@ enum ScreenshotFixture {
     }
 
     /// The Sample board's services (`SampleServices`) with the fixture's extras: one person who
-    /// always fails to load, `-ScreenshotRestrictedOrg <name>` and `-ScreenshotHide <login>`. It
+    /// always fails to load, `-ScreenshotRestrictedOrg <name>`, `-ScreenshotHide <login>` and
+    /// `-ScreenshotPin <login,login>`. It
     /// loads at once, refreshing twice so Today shows movement chevrons.
     ///
     /// `extraPeople` adds that many followed people (`sample-pal-01`, …) below everyone else, for a
@@ -205,18 +223,25 @@ enum ScreenshotFixture {
             includesFailingCompetitor: failingCompetitor,
             restrictedOrganizations: value(after: "-ScreenshotRestrictedOrg").map { [$0] },
             trollPerson: value(after: "-ScreenshotTroll"),
-            countScale: value(after: "-ScreenshotCountScale").flatMap(Int.init).map { max(1, $0) } ?? 1
+            countScale: value(after: "-ScreenshotCountScale").flatMap(Int.init).map { max(1, $0) } ?? 1,
+            recordDay: value(after: "-ScreenshotRecordDay").flatMap(Int.init)
         ), now: now)
-        let hide = value(after: "-ScreenshotHide")
+        let hide = value(after: "-ScreenshotHide")?.split(separator: ",").map(String.init)
+        let pins = value(after: "-ScreenshotPin")?.split(separator: ",").map(String.init) ?? []
         // `-ScreenshotWindow monthly`: the board opens on that Window (a raw value).
         if let window = value(after: "-ScreenshotWindow").flatMap(ContributionWindow.init(rawValue:)) {
             services.store.selectedWindow = window
         }
         Task {
             await services.auth.refreshIdentity()
-            if let hide {
+            if hide != nil || !pins.isEmpty {
                 await services.roster.refresh(force: true)
-                services.store.setHidden(true, username: hide)
+            }
+            for login in hide ?? [] {
+                services.store.setHidden(true, username: login)
+            }
+            for login in pins {
+                services.store.setPinned(true, username: login)
             }
             // Two refreshes on the same day: the first sets today's baseline, the second moves.
             await services.refresh.refreshAll(reason: .manual)

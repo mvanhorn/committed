@@ -39,6 +39,9 @@ extension StandingRowStyle {
         streakMarkSize: 13,
         streakTextStyle: .footnote,
         streakMarkColor: .limeDeep,
+        // Your rivals' gap ("3 to pass"): quiet, but it's news, so never muted.
+        captionFont: .footnote,
+        captionColor: .soft,
         // The Mac's 2×2 squares glyph, tinted on the site's ramp; Live rank's rows match.
         squares: .shadedSymbol(Color.rowGlyphs),
         // The troll face reads at a glance only a little larger than the squares glyph.

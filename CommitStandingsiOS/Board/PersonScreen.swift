@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// The person view on iPhone: the shared `PersonViewContent` in the app's materials, scrolling on
-/// ink, with the iPhone's private-contributions tip on your own view. `BoardView` pushes it onto
+/// ink, with Your records under the stats and the iPhone's private-contributions tip on your own
+/// view. `BoardView` pushes it onto
 /// the Board, or shows it in the second pane on iPhone Duo when the panes sit side by side.
 ///
 /// Wherever it's wider than tall and has room for two readable columns (the closed iPhone Duo or
@@ -12,6 +13,8 @@ import SwiftUI
 /// than wide it's one column that scrolls, which needs nothing from the fold.
 struct PersonScreen: View {
     let person: PersonSummary
+    /// Your records, drawn under the stats on your own view only.
+    var records: PersonalRecords?
     /// Off in the Board's second pane, which is already one half of the Board.
     var allowsColumns = true
     @State private var size: CGSize = .zero
@@ -47,6 +50,10 @@ struct PersonScreen: View {
         ScrollView {
             PersonViewContent(person: person, initialDay: Self.initialDay, part: part) {
                 PrivateWorkTip(dismissible: false)
+            } underStats: {
+                if person.isYou, let records {
+                    YourRecordsSection(records: records)
+                }
             }
             .padding(16)
             .frame(maxWidth: 640)
@@ -87,17 +94,83 @@ struct PersonProfileLink: View {
     }
 }
 
-/// The person view pushed onto the Board: back to the Board on the leading side, their GitHub
-/// profile on the trailing side, and the tab bar still there.
+/// Rival, in the bar beside GitHub on someone else's view: a pin labelled "Rival", or "Pinned" when
+/// on, read as "Rival" or "Rival, pinned". With three rivals pinned it stays tappable and explains
+/// the limit instead, offering no replacement. Your own view has none.
+struct RivalPinButton: View {
+    @Environment(StandingsStore.self) private var store
+    let person: PersonSummary
+    @State private var explainingLimit = false
+
+    var body: some View {
+        if !person.isYou {
+            let pinned = store.isPinned(person.login)
+            let atLimit = !pinned && !store.canPinAnotherRival
+            Button {
+                if pinned {
+                    store.setPinned(false, username: person.login)
+                } else if atLimit {
+                    explainingLimit = true
+                } else {
+                    store.setPinned(true, username: person.login)
+                }
+            } label: {
+                // The pin and its word, not a `Label`: a bar shows a label's icon alone, and the
+                // word is the state.
+                HStack(spacing: 5) {
+                    Image(systemName: pinned ? "pin.fill" : "pin")
+                        .contentTransition(.symbolEffect(.replace))
+                    Text(pinned ? "Pinned" : "Rival")
+                }
+            }
+            .tint(.lime)
+            .sensoryFeedback(.selection, trigger: pinned)
+            .accessibilityLabel("Rival")
+            .accessibilityInputLabels(["Rival", "Pinned"])
+            .accessibilityValue(pinned ? "pinned" : "")
+            .accessibilityHint(pinned ? "Unpins \(person.login) from Your rivals"
+                               : atLimit ? Self.limitMessage
+                               : "Pins \(person.login) to Your rivals on the Board")
+            .popover(isPresented: $explainingLimit) {
+                Text(Self.limitMessage)
+                    .font(.callout)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .presentationCompactAdaptation(.popover)
+            }
+            #if DEBUG
+            .task {
+                // After the push settles, so the popover has a bar button to point at.
+                guard ScreenshotFixture.explainsRivalLimit else { return }
+                try? await Task.sleep(for: .seconds(4))
+                if !store.isPinned(person.login) && !store.canPinAnotherRival { explainingLimit = true }
+            }
+            #endif
+        }
+    }
+
+    static let limitMessage = "You can pin up to \(StandingsStore.maxPinnedRivals) rivals"
+}
+
+/// The person view pushed onto the Board: back to the Board on the leading side, Rival and their
+/// GitHub profile on the trailing side, and the tab bar still there.
 struct PersonDestination: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         Group {
             if let person = model.shownPerson {
-                PersonScreen(person: person)
+                PersonScreen(person: person, records: person.isYou ? model.yourRecords : nil)
                     .navigationTitle(person.isYou ? "Your month" : "\(person.login)’s month")
                     .toolbar {
+                        if !person.isYou {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                RivalPinButton(person: person)
+                            }
+                            // Beside GitHub with its words on iPhone Duo too: in the vertical bar it
+                            // would be a bare pin, and "Rival" / "Pinned" is the state.
+                            .axisBehavior(.horizontalOnly)
+                        }
                         ToolbarItem(placement: .topBarTrailing) {
                             PersonProfileLink(person: person)
                         }
@@ -112,7 +185,7 @@ struct PersonDestination: View {
 }
 
 /// The person view in the second pane on the open iPhone Duo, where your summary otherwise sits,
-/// with a button back to your summary and their GitHub profile.
+/// with a button back to your summary, Rival and their GitHub profile.
 struct PersonPane: View {
     @Environment(AppModel.self) private var model
     let person: PersonSummary
@@ -129,12 +202,15 @@ struct PersonPane: View {
                 .tint(.lime)
                 .accessibilityHint("Closes \(person.login)’s month")
                 Spacer()
-                PersonProfileLink(person: person)
-                    .font(.callout.weight(.semibold))
+                HStack(spacing: 18) {
+                    RivalPinButton(person: person)
+                    PersonProfileLink(person: person)
+                }
+                .font(.callout.weight(.semibold))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            PersonScreen(person: person, allowsColumns: false)
+            PersonScreen(person: person, records: person.isYou ? model.yourRecords : nil, allowsColumns: false)
         }
         .background(Color.ink)
         .accessibilityElement(children: .contain)
