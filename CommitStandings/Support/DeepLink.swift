@@ -48,8 +48,14 @@ enum DeepLink: Equatable, Sendable {
     /// it with their Challenge share, Open Board opens the Board. Nil for anything else (another kind,
     /// a dismissal, an unknown action), and the app just opens.
     init?(notification userInfo: [AnyHashable: Any], action: String = Self.bodyTapAction) {
-        guard userInfo["kind"] as? String == "pass" else { return nil }
         let login = (userInfo["login"] as? String).flatMap(UsernameNormalization.normalize)
+        // A relay close call (#132) has no actions: tapping it opens that person's view.
+        if userInfo["kind"] as? String == "closeCall" {
+            guard action == Self.bodyTapAction, let login else { return nil }
+            self = .person(login: login)
+            return
+        }
+        guard userInfo["kind"] as? String == "pass" else { return nil }
         switch action {
         case Self.bodyTapAction:
             guard let login else { return nil }
