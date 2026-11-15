@@ -46,10 +46,17 @@ enum DeepLink: Equatable, Sendable {
 
     /// Where a tapped relay notification goes. A pass: the body opens the rival's view, Share your
     /// race opens it with their Challenge share, Open Board opens the Board. A close call (#132) opens
-    /// that person's view; a record (#134), which carries your own login, opens your own view. Nil
-    /// for anything else (another kind, a dismissal, an unknown action), and the app just opens.
+    /// that person's view; a record (#134), which carries your own login, opens your own view; a
+    /// result (#131, a daily result or last week's final) opens the Board. Nil for anything else
+    /// (another kind, a dismissal, an unknown action), and the app just opens.
     init?(notification userInfo: [AnyHashable: Any], action: String = Self.bodyTapAction) {
         let kind = userInfo["kind"] as? String
+        // A result has no actions either: tapping it opens the Board.
+        if kind == "result" {
+            guard action == Self.bodyTapAction else { return nil }
+            self = .board(window: nil)
+            return
+        }
         let login = (userInfo["login"] as? String).flatMap(UsernameNormalization.normalize)
         // Close calls, records and streak reminders have no actions: tapping one opens the view of
         // the login it names (yours, for records and streak reminders).

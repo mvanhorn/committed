@@ -6,6 +6,7 @@ import { notifyCloseCalls } from "./closeCalls";
 import { notifyPasses } from "./passes";
 import { notifyRecords } from "./records";
 import { parsePreferences, type NotificationPreferences } from "./preferences";
+import { notifyResults } from "./results";
 import { parseState, type NotificationState } from "./state";
 import { notifyStreakReminder } from "./streakReminder";
 
@@ -48,6 +49,7 @@ export async function runNotifications(
   state = await notifyCloseCalls(context, state, (next) => saveState(row, next, deps), deps);
   state = await notifyRecords(context, state, (next) => saveState(row, next, deps), deps);
   state = await notifyStreakReminder(context, state, (next) => saveState(row, next, deps), deps);
+  state = await notifyResults(context, state, (next) => saveState(row, next, deps), deps);
 }
 
 /** State is saved before anything is sent, so a failure mid-send can't send the same thing twice. */

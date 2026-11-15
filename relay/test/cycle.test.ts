@@ -726,9 +726,9 @@ describe("relay notifications: passes", () => {
     await registerNotifications();
     await relay.runCycle();
     expect(JSON.parse(String((await storedRow())!.notification_state))).toHaveProperty("passes");
-    // Another kind's state, as a later kind (results, close calls, …) leaves it.
+    // Another kind's state, under a key no kind here owns (results and records write their own).
     const theirs = { sent: "2026-11-04" };
-    const state = { ...JSON.parse(String((await storedRow())!.notification_state)), results: theirs };
+    const state = { ...JSON.parse(String((await storedRow())!.notification_state)), later: theirs };
     await env.DB.prepare("UPDATE installations SET notification_state = ? WHERE id = ?")
       .bind(JSON.stringify(state), ID).run();
 
@@ -741,7 +741,9 @@ describe("relay notifications: passes", () => {
     const row = (await storedRow())!;
     expect(row.alert_token).toBe(ALERT);
     expect(JSON.parse(String(row.notifications_json))).toMatchObject({ passes: "off", results: true });
-    expect(JSON.parse(String(row.notification_state))).toEqual({ results: theirs });
+    const kept = JSON.parse(String(row.notification_state)) as Record<string, unknown>;
+    expect(kept).not.toHaveProperty("passes");
+    expect(kept).toMatchObject({ later: theirs });
   });
 
   it("with passes back on, takes a fresh baseline instead of replaying what passed while off", async () => {

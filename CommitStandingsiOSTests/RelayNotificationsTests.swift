@@ -487,6 +487,25 @@ struct RelayNotificationsTests {
         #expect(model.selectedPerson == nil)
     }
 
+    /// A daily result or last week's final (#131) opens the Board, on whichever Window it's on.
+    @Test func aTappedResultOpensTheBoard() async {
+        let (model, _) = makeModel()
+        await model.sceneDidBecomeActive()
+        model.selectedTab = .settings
+
+        let link = DeepLink(notification: ["kind": "result", "aps": ["thread-id": "results"]])
+        #expect(link == .board(window: nil))
+        model.open(link!)
+
+        #expect(model.selectedTab == .board)
+        #expect(model.selectedPerson == nil)
+    }
+
+    @Test func onlyATapOnAResultOpensSomething() {
+        #expect(DeepLink(notification: ["kind": "result"], action: "com.apple.UNNotificationDismissActionIdentifier") == nil)
+        #expect(DeepLink(notification: ["kind": "something-new"]) == nil)
+    }
+
     /// A record notification (#134) carries your own login: tapping it opens your own view.
     @Test func aTappedRecordOpensYourOwnView() async {
         let (model, _) = makeModel()
@@ -510,7 +529,6 @@ struct RelayNotificationsTests {
         #expect(DeepLink(url: URL(string: "committed://person/Ada")!) == .person(login: "ada"))
         #expect(DeepLink(url: URL(string: "committed://person/")!) == nil)
         #expect(DeepLink(url: URL(string: "committed://person/a/b")!) == nil)
-        #expect(DeepLink(notification: ["kind": "result"]) == nil)
     }
 
     // MARK: Streak reminder taps (#133)
