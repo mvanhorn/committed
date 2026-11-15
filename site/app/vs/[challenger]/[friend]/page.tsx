@@ -41,7 +41,7 @@ export default async function ChallengePage({ params }: Props) {
 
       <main className="mx-auto flex w-full max-w-[44rem] flex-col items-center gap-5 pt-8 pb-[clamp(40px,6vw,72px)] text-center sm:pt-14">
         <p className="font-mono text-[11px] font-medium tracking-[.06em] text-lime uppercase">{view.eyebrow}</p>
-        <h1 className="max-w-[16ch] animate-rise text-[clamp(40px,8vw,76px)] leading-[0.96] font-[750] tracking-[-0.055em] text-balance">{view.headline}</h1>
+        <h1 className="max-w-[16ch] animate-rise text-[clamp(40px,8vw,76px)] leading-[0.96] font-[750] tracking-[-0.04em] [word-spacing:0.06em] text-balance">{view.headline}</h1>
         {view.ok ? <p className="max-w-[32rem] text-lg leading-relaxed text-soft">{view.subline}</p> : null}
       </main>
 

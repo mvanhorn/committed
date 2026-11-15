@@ -50,7 +50,10 @@ export default async function ChallengeImage({ params }: { params: Promise<{ cha
         <div
           style={{
             position: "absolute",
-            inset: 0,
+            top: 0,
+            left: 0,
+            width: size.width,
+            height: size.height,
             display: "flex",
             background: "linear-gradient(90deg, #050505 0%, rgba(5,5,5,.94) 52%, rgba(5,5,5,.55) 78%, rgba(5,5,5,.2) 100%)",
           }}
@@ -66,7 +69,17 @@ export default async function ChallengeImage({ params }: { params: Promise<{ cha
             {view.ok ? (
               <span style={{ fontSize: 30, fontWeight: 800, letterSpacing: 3, color: "#C8FF2E" }}>{view.score}</span>
             ) : null}
-            <span style={{ marginTop: 22, fontSize: words.length > 40 ? 68 : 84, fontWeight: 800, letterSpacing: -3.5, lineHeight: 1.02 }}>{words}</span>
+            {/* One flex item per word, so a line breaks only between words. */}
+            <div style={{ display: "flex", flexWrap: "wrap", marginTop: 22, fontSize: words.length > 40 ? 68 : 84, fontWeight: 800, letterSpacing: -3.5, lineHeight: 1.02 }}>
+              {words.split(" ").map((word, i) => (
+                // A word never wraps inside: Satori would otherwise break "odile-m" at its hyphen.
+                <div key={i} style={{ display: "flex", flexShrink: 0, marginRight: "0.22em" }}>
+                  {word.split(/(-)/).filter(Boolean).map((piece, j) => (
+                    <span key={j}>{piece}</span>
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
           <span style={{ fontSize: 28, color: "#8E9288" }}>gitcommitted.app</span>
         </div>
