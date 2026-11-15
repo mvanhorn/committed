@@ -13,11 +13,12 @@ struct AboutYouSection: View {
     var body: some View {
         Section {
             // Records (#134) goes here, above Streak reminder.
-            Toggle("Streak reminder", isOn: model.notificationChoice(\.streakReminder))
+            Toggle(isOn: model.notificationChoice(\.streakReminder)) {
+                Text("Streak reminder")
+                Text("At 8 PM, or an hour before quiet hours if that's earlier, when your streak is 2 days or more and you haven't contributed yet today.")
+            }
         } header: {
             FolioHeader("About you")
-        } footer: {
-            Text("**Streak reminder:** at 8 PM, or an hour before quiet hours if that's earlier, when your streak is 2 days or more and you haven't contributed yet today.")
         }
     }
 }
