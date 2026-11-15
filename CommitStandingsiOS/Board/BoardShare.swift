@@ -247,7 +247,7 @@ extension WidgetSnapshot {
 }
 
 /// Committed and how many people are on the board, then where to get it.
-private struct BoardShareFooter: View {
+struct BoardShareFooter: View {
     let peopleCount: Int
 
     var body: some View {
@@ -267,7 +267,7 @@ private struct BoardShareFooter: View {
 
 /// The contribution graph's squares behind everything, as on the site: mostly empty, some green,
 /// the odd lime one. The same pattern every time, brightest at the edges.
-private struct BoardShareSquareField: View {
+struct BoardShareSquareField: View {
     let brightness: Double
 
     var body: some View {
@@ -413,7 +413,7 @@ struct BoardShareSheet: View {
 }
 
 /// The system share sheet with only the PNG.
-private struct BoardShareActivity: UIViewControllerRepresentable {
+struct BoardShareActivity: UIViewControllerRepresentable {
     let url: URL
 
     func makeUIViewController(context: Context) -> UIActivityViewController {

@@ -59,11 +59,14 @@ extension EnvironmentValues {
 /// their count loads it says it's waiting. Your own view adds the private-contributions tip
 /// (`privateTip`, which each platform styles) and what the number can't show.
 ///
-/// The host scrolls it and sets its width; this view has no platform-only types.
-struct PersonViewContent<Tip: View>: View {
+/// The host scrolls it and sets its width; this view has no platform-only types. A host can add a
+/// section under the stats (`underStats`): the iPhone puts Your records there on your own view.
+/// The Mac adds nothing.
+struct PersonViewContent<Tip: View, UnderStats: View>: View {
     let person: PersonSummary
     private let part: PersonViewPart
     private let privateTip: Tip
+    private let underStats: UnderStats
     @Environment(\.personViewStyle) private var style
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// The selected bar's day of the month: today until another is picked.
@@ -71,10 +74,11 @@ struct PersonViewContent<Tip: View>: View {
     @State private var touchedBar: String?
 
     init(person: PersonSummary, initialDay: Int? = nil, part: PersonViewPart = .all,
-         @ViewBuilder privateTip: () -> Tip) {
+         @ViewBuilder privateTip: () -> Tip, @ViewBuilder underStats: () -> UnderStats) {
         self.person = person
         self.part = part
         self.privateTip = privateTip()
+        self.underStats = underStats()
         _selectedDay = State(initialValue: initialDay ?? person.dayOfMonth)
     }
 
@@ -106,6 +110,7 @@ struct PersonViewContent<Tip: View>: View {
                     }
                     #endif
                     stats(days)
+                    underStats
                 }
                 if part.month {
                     month(days)
@@ -561,7 +566,15 @@ private struct DayBar: Identifiable {
     }
 }
 
-extension PersonViewContent where Tip == PrivateContributionsTip {
+extension PersonViewContent where UnderStats == EmptyView {
+    /// The person view with nothing added under the stats.
+    init(person: PersonSummary, initialDay: Int? = nil, part: PersonViewPart = .all,
+         @ViewBuilder privateTip: () -> Tip) {
+        self.init(person: person, initialDay: initialDay, part: part, privateTip: privateTip) { EmptyView() }
+    }
+}
+
+extension PersonViewContent where Tip == PrivateContributionsTip, UnderStats == EmptyView {
     /// The person view with the Mac's private-contributions tip, always shown on your own view.
     init(person: PersonSummary, initialDay: Int? = nil, part: PersonViewPart = .all) {
         self.init(person: person, initialDay: initialDay, part: part) {

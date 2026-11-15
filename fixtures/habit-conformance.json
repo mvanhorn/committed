@@ -254,5 +254,313 @@
       }
     }
   ],
-  "records": []
+  "records": [
+    {
+      "about": "Your records (#127; the relay's record notifications port the same rules in #134). Input: `you` and each rival as {YYYY-MM-DD: n} calendars, read in `timeZone`; `asOf` is the local day at `now` in `timeZone` (today). Only your calendar's days from its first day through today count: a missing day is 0, a later day never counts. Rivals are the people on your board now (hidden people are left out before this). A week is Monday to Sunday in `timeZone`. Ties with an old best never set a record, and when several days, weeks, runs or windows share the best, the earliest is the record (it set it first). bestDay: the most in one day. bestWeek: the most in one week (this week counts so far). longestStreak: the most days in a row with a contribution. best30Days: the most in any 30 days in a row ending on a day through today. Each is null while it's 0, else {value, first, last (day keys), new}; a week's first and last are its Monday and Sunday. `new` (the tile's New badge): bestDay and best30Days end today; bestWeek is this week; longestStreak's run ends today. daysAtNumberOne: null without a rival, else {value: days you had more than 0 and at least as many as every rival, last: the most recent such day or null}. firstWeekAtNumberOne: null without a rival, else {week: the first finished week (its Sunday before today) you had more than 0 and at least as many as every rival, or null; new: that week is last week; rankThisWeek: 1 + rivals with more than you this week so far}. `set` lists the records broken today, in the order bestDay, bestWeek, longestStreak: the record card and record notifications fire only for these, once. bestDay is set when today beats every earlier day; bestWeek when this week through yesterday was at most the best earlier week and through today beats it; longestStreak when today has a contribution and today's run is exactly one day longer than the longest run that ended before it began. `oldBest` is that earlier best, with its first and last day, or null when there was none (nothing above 0). `meetsMinimum`: an old best day of at least 5; an old best week of at least 1 (there must be one to name); an old longest streak of at least 7 days. The card and notification need it.",
+      "name": "best day and best week set today; a later day never counts",
+      "input": {
+        "timeZone": "UTC",
+        "now": 1794484800,
+        "asOf": "2026-11-12",
+        "you": { "2026-11-02": 33, "2026-11-03": 4, "2026-11-10": 2, "2026-11-11": 0, "2026-11-12": 41, "2026-11-13": 99 },
+        "rivals": {}
+      },
+      "expected": {
+        "bestDay": { "value": 41, "first": "2026-11-12", "last": "2026-11-12", "new": true },
+        "bestWeek": { "value": 43, "first": "2026-11-09", "last": "2026-11-15", "new": true },
+        "longestStreak": { "value": 2, "first": "2026-11-02", "last": "2026-11-03", "new": false },
+        "best30Days": { "value": 80, "first": "2026-10-14", "last": "2026-11-12", "new": true },
+        "daysAtNumberOne": null,
+        "firstWeekAtNumberOne": null,
+        "set": [
+          { "record": "bestDay", "value": 41, "oldBest": { "value": 33, "first": "2026-11-02", "last": "2026-11-02" }, "meetsMinimum": true },
+          { "record": "bestWeek", "value": 43, "oldBest": { "value": 37, "first": "2026-11-02", "last": "2026-11-08" }, "meetsMinimum": true }
+        ]
+      }
+    },
+    {
+      "name": "best day over an old best of 4 is under the minimum",
+      "input": {
+        "timeZone": "UTC",
+        "now": 1794484800,
+        "asOf": "2026-11-12",
+        "you": { "2026-11-05": 4, "2026-11-12": 9 },
+        "rivals": {}
+      },
+      "expected": {
+        "bestDay": { "value": 9, "first": "2026-11-12", "last": "2026-11-12", "new": true },
+        "bestWeek": { "value": 9, "first": "2026-11-09", "last": "2026-11-15", "new": true },
+        "longestStreak": { "value": 1, "first": "2026-11-05", "last": "2026-11-05", "new": false },
+        "best30Days": { "value": 13, "first": "2026-10-14", "last": "2026-11-12", "new": true },
+        "daysAtNumberOne": null,
+        "firstWeekAtNumberOne": null,
+        "set": [
+          { "record": "bestDay", "value": 9, "oldBest": { "value": 4, "first": "2026-11-05", "last": "2026-11-05" }, "meetsMinimum": false },
+          { "record": "bestWeek", "value": 9, "oldBest": { "value": 4, "first": "2026-11-02", "last": "2026-11-08" }, "meetsMinimum": true }
+        ]
+      }
+    },
+    {
+      "name": "best day over an old best of exactly 5 meets the minimum",
+      "input": {
+        "timeZone": "UTC",
+        "now": 1794484800,
+        "asOf": "2026-11-12",
+        "you": { "2026-11-05": 5, "2026-11-12": 6 },
+        "rivals": {}
+      },
+      "expected": {
+        "bestDay": { "value": 6, "first": "2026-11-12", "last": "2026-11-12", "new": true },
+        "bestWeek": { "value": 6, "first": "2026-11-09", "last": "2026-11-15", "new": true },
+        "longestStreak": { "value": 1, "first": "2026-11-05", "last": "2026-11-05", "new": false },
+        "best30Days": { "value": 11, "first": "2026-10-14", "last": "2026-11-12", "new": true },
+        "daysAtNumberOne": null,
+        "firstWeekAtNumberOne": null,
+        "set": [
+          { "record": "bestDay", "value": 6, "oldBest": { "value": 5, "first": "2026-11-05", "last": "2026-11-05" }, "meetsMinimum": true },
+          { "record": "bestWeek", "value": 6, "oldBest": { "value": 5, "first": "2026-11-02", "last": "2026-11-08" }, "meetsMinimum": true }
+        ]
+      }
+    },
+    {
+      "name": "equalling the old best day and week is not a record",
+      "input": {
+        "timeZone": "UTC",
+        "now": 1794484800,
+        "asOf": "2026-11-12",
+        "you": { "2026-11-03": 20, "2026-11-12": 20 },
+        "rivals": {}
+      },
+      "expected": {
+        "bestDay": { "value": 20, "first": "2026-11-03", "last": "2026-11-03", "new": false },
+        "bestWeek": { "value": 20, "first": "2026-11-02", "last": "2026-11-08", "new": false },
+        "longestStreak": { "value": 1, "first": "2026-11-03", "last": "2026-11-03", "new": false },
+        "best30Days": { "value": 40, "first": "2026-10-14", "last": "2026-11-12", "new": true },
+        "daysAtNumberOne": null,
+        "firstWeekAtNumberOne": null,
+        "set": []
+      }
+    },
+    {
+      "name": "a tied old best is named by its first day",
+      "input": {
+        "timeZone": "UTC",
+        "now": 1794484800,
+        "asOf": "2026-11-12",
+        "you": { "2026-10-20": 33, "2026-11-03": 33, "2026-11-12": 41 },
+        "rivals": {}
+      },
+      "expected": {
+        "bestDay": { "value": 41, "first": "2026-11-12", "last": "2026-11-12", "new": true },
+        "bestWeek": { "value": 41, "first": "2026-11-09", "last": "2026-11-15", "new": true },
+        "longestStreak": { "value": 1, "first": "2026-10-20", "last": "2026-10-20", "new": false },
+        "best30Days": { "value": 107, "first": "2026-10-14", "last": "2026-11-12", "new": true },
+        "daysAtNumberOne": null,
+        "firstWeekAtNumberOne": null,
+        "set": [
+          { "record": "bestDay", "value": 41, "oldBest": { "value": 33, "first": "2026-10-20", "last": "2026-10-20" }, "meetsMinimum": true },
+          { "record": "bestWeek", "value": 41, "oldBest": { "value": 33, "first": "2026-10-19", "last": "2026-10-25" }, "meetsMinimum": true }
+        ]
+      }
+    },
+    {
+      "name": "longest streak set today over an old best of exactly 7 days",
+      "input": {
+        "timeZone": "UTC",
+        "now": 1794484800,
+        "asOf": "2026-11-12",
+        "you": {
+          "2026-10-01": 1, "2026-10-02": 1, "2026-10-03": 1, "2026-10-04": 1, "2026-10-05": 1, "2026-10-06": 1, "2026-10-07": 1,
+          "2026-11-05": 1, "2026-11-06": 1, "2026-11-07": 1, "2026-11-08": 1, "2026-11-09": 1, "2026-11-10": 1, "2026-11-11": 1, "2026-11-12": 1
+        },
+        "rivals": {}
+      },
+      "expected": {
+        "bestDay": { "value": 1, "first": "2026-10-01", "last": "2026-10-01", "new": false },
+        "bestWeek": { "value": 4, "first": "2026-09-28", "last": "2026-10-04", "new": false },
+        "longestStreak": { "value": 8, "first": "2026-11-05", "last": "2026-11-12", "new": true },
+        "best30Days": { "value": 8, "first": "2026-10-14", "last": "2026-11-12", "new": true },
+        "daysAtNumberOne": null,
+        "firstWeekAtNumberOne": null,
+        "set": [
+          { "record": "longestStreak", "value": 8, "oldBest": { "value": 7, "first": "2026-10-01", "last": "2026-10-07" }, "meetsMinimum": true }
+        ]
+      }
+    },
+    {
+      "name": "longest streak over an old best of 6 days is under the minimum",
+      "input": {
+        "timeZone": "UTC",
+        "now": 1794484800,
+        "asOf": "2026-11-12",
+        "you": {
+          "2026-10-01": 1, "2026-10-02": 1, "2026-10-03": 1, "2026-10-04": 1, "2026-10-05": 1, "2026-10-06": 1,
+          "2026-11-06": 1, "2026-11-07": 1, "2026-11-08": 1, "2026-11-09": 1, "2026-11-10": 1, "2026-11-11": 1, "2026-11-12": 1
+        },
+        "rivals": {}
+      },
+      "expected": {
+        "bestDay": { "value": 1, "first": "2026-10-01", "last": "2026-10-01", "new": false },
+        "bestWeek": { "value": 4, "first": "2026-09-28", "last": "2026-10-04", "new": false },
+        "longestStreak": { "value": 7, "first": "2026-11-06", "last": "2026-11-12", "new": true },
+        "best30Days": { "value": 7, "first": "2026-10-14", "last": "2026-11-12", "new": true },
+        "daysAtNumberOne": null,
+        "firstWeekAtNumberOne": null,
+        "set": [
+          { "record": "longestStreak", "value": 7, "oldBest": { "value": 6, "first": "2026-10-01", "last": "2026-10-06" }, "meetsMinimum": false }
+        ]
+      }
+    },
+    {
+      "name": "the day after a streak record keeps New but sets nothing; the week crosses today",
+      "input": {
+        "timeZone": "UTC",
+        "now": 1794571200,
+        "asOf": "2026-11-13",
+        "you": {
+          "2026-10-01": 1, "2026-10-02": 1, "2026-10-03": 1, "2026-10-04": 1, "2026-10-05": 1, "2026-10-06": 1, "2026-10-07": 1,
+          "2026-11-05": 1, "2026-11-06": 1, "2026-11-07": 1, "2026-11-08": 1, "2026-11-09": 1, "2026-11-10": 1, "2026-11-11": 1, "2026-11-12": 1,
+          "2026-11-13": 1
+        },
+        "rivals": {}
+      },
+      "expected": {
+        "bestDay": { "value": 1, "first": "2026-10-01", "last": "2026-10-01", "new": false },
+        "bestWeek": { "value": 5, "first": "2026-11-09", "last": "2026-11-15", "new": true },
+        "longestStreak": { "value": 9, "first": "2026-11-05", "last": "2026-11-13", "new": true },
+        "best30Days": { "value": 9, "first": "2026-10-15", "last": "2026-11-13", "new": true },
+        "daysAtNumberOne": null,
+        "firstWeekAtNumberOne": null,
+        "set": [
+          { "record": "bestWeek", "value": 5, "oldBest": { "value": 4, "first": "2026-09-28", "last": "2026-10-04" }, "meetsMinimum": true }
+        ]
+      }
+    },
+    {
+      "name": "a best week crossed yesterday isn't set again today",
+      "input": {
+        "timeZone": "UTC",
+        "now": 1794484800,
+        "asOf": "2026-11-12",
+        "you": { "2026-11-02": 10, "2026-11-10": 6, "2026-11-11": 6, "2026-11-12": 3 },
+        "rivals": {}
+      },
+      "expected": {
+        "bestDay": { "value": 10, "first": "2026-11-02", "last": "2026-11-02", "new": false },
+        "bestWeek": { "value": 15, "first": "2026-11-09", "last": "2026-11-15", "new": true },
+        "longestStreak": { "value": 3, "first": "2026-11-10", "last": "2026-11-12", "new": true },
+        "best30Days": { "value": 25, "first": "2026-10-14", "last": "2026-11-12", "new": true },
+        "daysAtNumberOne": null,
+        "firstWeekAtNumberOne": null,
+        "set": []
+      }
+    },
+    {
+      "name": "Sunday evening in Los Angeles is still the week that began Monday",
+      "input": {
+        "timeZone": "America/Los_Angeles",
+        "now": 1794805200,
+        "asOf": "2026-11-15",
+        "you": { "2026-11-04": 15, "2026-11-09": 10, "2026-11-15": 12 },
+        "rivals": {}
+      },
+      "expected": {
+        "bestDay": { "value": 15, "first": "2026-11-04", "last": "2026-11-04", "new": false },
+        "bestWeek": { "value": 22, "first": "2026-11-09", "last": "2026-11-15", "new": true },
+        "longestStreak": { "value": 1, "first": "2026-11-04", "last": "2026-11-04", "new": false },
+        "best30Days": { "value": 37, "first": "2026-10-17", "last": "2026-11-15", "new": true },
+        "daysAtNumberOne": null,
+        "firstWeekAtNumberOne": null,
+        "set": [
+          { "record": "bestWeek", "value": 22, "oldBest": { "value": 15, "first": "2026-11-02", "last": "2026-11-08" }, "meetsMinimum": true }
+        ]
+      }
+    },
+    {
+      "name": "days at #1: ties count for you, empty days don't, a rival's missing day is 0",
+      "input": {
+        "timeZone": "UTC",
+        "now": 1794484800,
+        "asOf": "2026-11-12",
+        "you": { "2026-11-09": 5, "2026-11-10": 3, "2026-11-11": 0, "2026-11-12": 4 },
+        "rivals": {
+          "ana": { "2026-11-09": 5, "2026-11-10": 4, "2026-11-11": 0 },
+          "ben": { "2026-11-09": 2, "2026-11-12": 1 }
+        }
+      },
+      "expected": {
+        "bestDay": { "value": 5, "first": "2026-11-09", "last": "2026-11-09", "new": false },
+        "bestWeek": { "value": 12, "first": "2026-11-09", "last": "2026-11-15", "new": true },
+        "longestStreak": { "value": 2, "first": "2026-11-09", "last": "2026-11-10", "new": false },
+        "best30Days": { "value": 12, "first": "2026-10-14", "last": "2026-11-12", "new": true },
+        "daysAtNumberOne": { "value": 2, "last": "2026-11-12" },
+        "firstWeekAtNumberOne": { "week": null, "new": false, "rankThisWeek": 1 },
+        "set": []
+      }
+    },
+    {
+      "name": "first week at #1: a tie counts for you, and last week is new",
+      "input": {
+        "timeZone": "UTC",
+        "now": 1794484800,
+        "asOf": "2026-11-12",
+        "you": { "2026-10-27": 3, "2026-11-03": 8, "2026-11-10": 20 },
+        "rivals": {
+          "ana": { "2026-10-27": 5, "2026-11-04": 8, "2026-11-10": 1 }
+        }
+      },
+      "expected": {
+        "bestDay": { "value": 20, "first": "2026-11-10", "last": "2026-11-10", "new": false },
+        "bestWeek": { "value": 20, "first": "2026-11-09", "last": "2026-11-15", "new": true },
+        "longestStreak": { "value": 1, "first": "2026-10-27", "last": "2026-10-27", "new": false },
+        "best30Days": { "value": 31, "first": "2026-10-12", "last": "2026-11-10", "new": false },
+        "daysAtNumberOne": { "value": 2, "last": "2026-11-10" },
+        "firstWeekAtNumberOne": { "week": { "first": "2026-11-02", "last": "2026-11-08" }, "new": true, "rankThisWeek": 1 },
+        "set": []
+      }
+    },
+    {
+      "name": "first week at #1: leading the week in progress doesn't count yet",
+      "input": {
+        "timeZone": "UTC",
+        "now": 1794484800,
+        "asOf": "2026-11-12",
+        "you": { "2026-11-03": 7, "2026-11-10": 20 },
+        "rivals": {
+          "ana": { "2026-11-04": 8, "2026-11-11": 30 },
+          "ben": { "2026-11-10": 25 }
+        }
+      },
+      "expected": {
+        "bestDay": { "value": 20, "first": "2026-11-10", "last": "2026-11-10", "new": false },
+        "bestWeek": { "value": 20, "first": "2026-11-09", "last": "2026-11-15", "new": true },
+        "longestStreak": { "value": 1, "first": "2026-11-03", "last": "2026-11-03", "new": false },
+        "best30Days": { "value": 27, "first": "2026-10-12", "last": "2026-11-10", "new": false },
+        "daysAtNumberOne": { "value": 1, "last": "2026-11-03" },
+        "firstWeekAtNumberOne": { "week": null, "new": false, "rankThisWeek": 3 },
+        "set": []
+      }
+    },
+    {
+      "name": "nothing in the calendar yet",
+      "input": {
+        "timeZone": "UTC",
+        "now": 1794484800,
+        "asOf": "2026-11-12",
+        "you": { "2026-11-01": 0 },
+        "rivals": {
+          "ana": { "2026-11-05": 3 }
+        }
+      },
+      "expected": {
+        "bestDay": null,
+        "bestWeek": null,
+        "longestStreak": null,
+        "best30Days": null,
+        "daysAtNumberOne": { "value": 0, "last": null },
+        "firstWeekAtNumberOne": { "week": null, "new": false, "rankThisWeek": 1 },
+        "set": []
+      }
+    }
+  ]
 }
