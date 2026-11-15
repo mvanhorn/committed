@@ -1,7 +1,7 @@
 import UserNotifications
 
 /// iOS hides a notification that arrives while its app is open unless the app says otherwise.
-/// Leaderboard Notifications show as a banner even while Committed is open, whether the app posted
+/// Pass notifications show as a banner even while Committed is open, whether the app posted
 /// them or the Committed relay sent them. Tapping one opens Committed where it points: a pass opens
 /// that person's view, and a relay pass's actions (#137) open it with the Challenge share (Share
 /// your race) or open the Board (Open Board). The Mac app doesn't need this.

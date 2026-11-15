@@ -105,6 +105,7 @@ struct PersonProfileLink: View {
 /// the limit instead, offering no replacement. Your own view has none.
 struct RivalPinButton: View {
     @Environment(StandingsStore.self) private var store
+    @Environment(AppModel.self) private var model
     let person: PersonSummary
     @State private var explainingLimit = false
 
@@ -113,12 +114,13 @@ struct RivalPinButton: View {
             let pinned = store.isPinned(person.login)
             let atLimit = !pinned && !store.canPinAnotherRival
             Button {
+                // Through the model, so the relay hears the new rivals right away.
                 if pinned {
-                    store.setPinned(false, username: person.login)
+                    Task { await model.setRivalPinned(false, username: person.login) }
                 } else if atLimit {
                     explainingLimit = true
                 } else {
-                    store.setPinned(true, username: person.login)
+                    Task { await model.setRivalPinned(true, username: person.login) }
                 }
             } label: {
                 // The pin and its word, not a `Label`: a bar shows a label's icon alone, and the

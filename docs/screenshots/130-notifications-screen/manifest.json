@@ -1,0 +1,88 @@
+{
+  "device": "iPhone Duo Simulator (shared persistent Duo 94D56458-B90B-484A-BA5E-16748D2CBEE5), closed, portrait",
+  "os": "iOS 27.1",
+  "notes": "Runtime captures, not renders. The time pickers were not opened (no tap access from the agent); quiet hours editing is shown with edited times saved through the fixture. The open iPhone Duo was not captured.",
+  "screenshots": [
+    {
+      "file": "before-settings.png",
+      "caption": "Before (spec/124-habit-loop with #126): Settings with the Leaderboard Notifications switch; copied from docs/screenshots/126-relay-passes/settings-relay-notifications.png",
+      "capture": {
+        "sourceCommit": "a1404ab83dcedbef6016f67b0aa45f037f430796",
+        "fixture": true
+      },
+      "notes": "Captured for #126 with the same fixture flags (-RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotTab settings)."
+    },
+    {
+      "file": "settings-row.png",
+      "caption": "After: Settings — the Notifications row (On, with a chevron) replaces the Leaderboard Notifications switch",
+      "capture": {
+        "sourceCommit": "0e4f03043fb38ba716059798245643b00d87c940",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -ScreenshotTab settings -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES."
+    },
+    {
+      "file": "notifications-default.png",
+      "caption": "Notifications screen, defaults: About your rivals (Passes on, People: Everyone, Window: Today) and Quiet hours on, 10:00 PM to 8:00 AM",
+      "capture": {
+        "sourceCommit": "0e4f03043fb38ba716059798245643b00d87c940",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -ScreenshotTab settings -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotNotifications."
+    },
+    {
+      "file": "notifications-pinned-rivals.png",
+      "caption": "Notifications screen with People: Pinned rivals; the footer names the pinned rivals (odile-m or ezra-q)",
+      "capture": {
+        "sourceCommit": "0e4f03043fb38ba716059798245643b00d87c940",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -ScreenshotTab settings -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotNotifications -ScreenshotPasses rivals -ScreenshotPin odile-m,ezra-q."
+    },
+    {
+      "file": "notifications-pinned-rivals-none.png",
+      "caption": "Notifications screen with Pinned rivals and nobody pinned: the footer says how to pin rivals and that no passes are sent until then",
+      "capture": {
+        "sourceCommit": "0e4f03043fb38ba716059798245643b00d87c940",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -ScreenshotTab settings -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotNotifications -ScreenshotPasses rivals."
+    },
+    {
+      "file": "notifications-quiet-hours-edited.png",
+      "caption": "Quiet hours edited to 11:30 PM to 7:00 AM (saved per account as 23:30–07:00)",
+      "capture": {
+        "sourceCommit": "0e4f03043fb38ba716059798245643b00d87c940",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -ScreenshotTab settings -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotNotifications -ScreenshotQuietHours 23:30-07:00."
+    },
+    {
+      "file": "notifications-quiet-hours-off.png",
+      "caption": "Quiet hours off: the Start and End rows go and the footer says notifications can make a sound at any hour",
+      "capture": {
+        "sourceCommit": "0e4f03043fb38ba716059798245643b00d87c940",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -ScreenshotTab settings -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotNotifications -ScreenshotQuietHours off."
+    },
+    {
+      "file": "notifications-permission-denied.png",
+      "caption": "Permission denied in iOS Settings: \"Notifications are off for Committed\" with Open iOS Settings at the top of the screen",
+      "capture": {
+        "sourceCommit": "0e4f03043fb38ba716059798245643b00d87c940",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -ScreenshotTab settings -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotNotifications -ScreenshotNotificationsDenied (iOS permission read as denied)."
+    },
+    {
+      "file": "notifications-no-relay.png",
+      "caption": "Without the relay (same variant as the Sample board and Not Now): only Passes, working in the app while it's open",
+      "capture": {
+        "sourceCommit": "0e4f03043fb38ba716059798245643b00d87c940",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -ScreenshotTab settings -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotNotifications -ScreenshotNoRelay (a relay build run as one without the relay)."
+    }
+  ]
+}

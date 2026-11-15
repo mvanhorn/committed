@@ -35,7 +35,7 @@ struct LiveRankDisclosureView: View {
                     }
                     .padding(.horizontal, 16)
                     .tileCard()
-                    Text("Turning off Live rank and Leaderboard Notifications, or disconnecting GitHub, deletes this iPhone's registration from the relay.")
+                    Text("Turning off Live rank and notifications, or disconnecting GitHub, deletes this iPhone's registration from the relay.")
                         .font(.footnote)
                         .foregroundStyle(Color.muted)
                 }

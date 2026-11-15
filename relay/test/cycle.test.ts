@@ -552,7 +552,13 @@ describe("relay notifications: passes", () => {
   const NOTIFICATIONS = { window: "daily", passes: "everyone" };
 
   async function registerNotifications(
-    overrides: Partial<{ liveRank: boolean; alertToken: string | null; notifications: unknown; competitors: string[] }> = {},
+    overrides: Partial<{
+      liveRank: boolean;
+      alertToken: string | null;
+      notifications: unknown;
+      competitors: string[];
+      rivals: string[];
+    }> = {},
   ) {
     await register(ID, { pushToStartToken: null });
     await put(`/v1/installations/${ID}`, {
@@ -727,6 +733,121 @@ describe("relay notifications: passes", () => {
     }
     expect(apns.sent).toHaveLength(0);
     expect(apns.alerts.length).toBeGreaterThan(0); // bob was passed along the way
+  });
+
+  it("with Pinned rivals, sends only your pinned rivals' passes", async () => {
+    github.set("carol", { "2026-11-05": 1 });
+    await registerNotifications({
+      competitors: ["me", "alice", "bob", "carol"],
+      notifications: { passes: "rivals" },
+      rivals: ["alice"],
+    });
+    await relay.runCycle();
+    // You pass bob (not pinned) and carol passes you (not pinned): silent.
+    github.set("me", { "2026-11-05": 10 });
+    github.set("carol", { "2026-11-05": 11 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(0);
+
+    // alice, pinned, passes you.
+    github.set("alice", { "2026-11-05": 12 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts.map((alert) => alert.payload.login)).toEqual(["alice"]);
+  });
+
+  it("with Pinned rivals and nobody pinned, sends no passes", async () => {
+    await registerNotifications({ notifications: { passes: "rivals" }, rivals: [] });
+    await relay.runCycle();
+    github.set("alice", { "2026-11-05": 7 });
+    github.set("me", { "2026-11-05": 10 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(0);
+  });
+
+  it("a rival pinned mid-day fires on their next real crossing, not a stale one", async () => {
+    await registerNotifications({ notifications: { passes: "rivals" }, rivals: [] });
+    await relay.runCycle();
+    github.set("alice", { "2026-11-05": 7 }); // alice passes you while not pinned: silent
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+
+    await registerNotifications({ notifications: { passes: "rivals" }, rivals: ["alice"] });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(0); // the earlier pass isn't replayed
+
+    github.set("me", { "2026-11-05": 8 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts.map((alert) => alert.payload.aps.alert.title)).toEqual(["🎉 You passed alice!"]);
+  });
+
+  it("takes a silent baseline when the Window changes", async () => {
+    github.set("me", { "2026-11-04": 10, "2026-11-05": 5 });
+    github.set("alice", { "2026-11-04": 0, "2026-11-05": 8 });
+    await registerNotifications(); // Today: alice ahead 8–5
+    await relay.runCycle();
+
+    // Over 7 days you're ahead 15–8: switching isn't a pass.
+    await registerNotifications({ notifications: { window: "weekly" } });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(0);
+
+    github.set("alice", { "2026-11-04": 0, "2026-11-05": 16 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts.map((alert) => alert.payload.login)).toEqual(["alice"]);
+  });
+
+  describe("quiet hours", () => {
+    // New York is UTC−5 on Nov 5.
+    const at = (hour: number, minute = 0) => Date.UTC(2026, 10, 5, hour + 5, minute) / 1000;
+
+    async function passAt(seconds: number, notifications: unknown = NOTIFICATIONS) {
+      clock.seconds = seconds - 5 * MINUTE;
+      await registerNotifications({ notifications });
+      await relay.runCycle();
+      github.set("alice", { "2026-11-05": 7 });
+      clock.seconds = seconds;
+      await relay.runCycle();
+      expect(apns.alerts).toHaveLength(1);
+      return apns.alerts[0]!.payload.aps;
+    }
+
+    it("delivers a pass during quiet hours passively, with no sound", async () => {
+      const aps = await passAt(at(23, 30)); // default 22:00–08:00
+      expect(aps["interruption-level"]).toBe("passive");
+      expect(aps.sound).toBeUndefined();
+      expect(aps.alert.title).toBe("😤 alice passed you");
+    });
+
+    it("stays passive after local midnight, until quiet hours end", async () => {
+      // 03:00 on Nov 5 in New York is still inside 22:00–08:00.
+      const aps = await passAt(at(3, 0));
+      expect(aps["interruption-level"]).toBe("passive");
+      expect(aps.sound).toBeUndefined();
+    });
+
+    it("plays the sound outside quiet hours", async () => {
+      const aps = await passAt(at(21, 59));
+      expect(aps.sound).toBe("default");
+      expect(aps["interruption-level"]).toBeUndefined();
+    });
+
+    it("with quiet hours off, never goes passive", async () => {
+      const aps = await passAt(at(23, 30), { ...NOTIFICATIONS, quietHours: null });
+      expect(aps.sound).toBe("default");
+      expect(aps["interruption-level"]).toBeUndefined();
+    });
+
+    it("follows the chosen hours, inside a single day", async () => {
+      const aps = await passAt(at(13, 0), { ...NOTIFICATIONS, quietHours: { start: "12:30", end: "14:00" } });
+      expect(aps["interruption-level"]).toBe("passive");
+    });
   });
 
   it("clears a dead alert token and logs it", async () => {
