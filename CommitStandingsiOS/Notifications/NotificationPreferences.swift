@@ -120,3 +120,38 @@ struct RelayNotificationsConfiguration: Equatable, Sendable {
     var preferences: NotificationPreferences
     var rivals: [String] = []
 }
+
+/// Quiet hours' times as the relay reads them: 24-hour "HH:MM", built from numbers rather than a
+/// date formatter, so a 12-hour clock or another locale on the iPhone can't change them.
+extension NotificationPreferences.QuietHours {
+    struct HourAndMinute: Equatable, Sendable {
+        var hour: Int
+        var minute: Int
+    }
+
+    static func time(hour: Int, minute: Int) -> String {
+        let pad = { (value: Int) in value < 10 ? "0\(value)" : "\(value)" }
+        return "\(pad(hour)):\(pad(minute))"
+    }
+
+    /// Nil for anything that isn't "HH:MM".
+    static func hourAndMinute(_ time: String) -> HourAndMinute? {
+        let parts = time.split(separator: ":")
+        guard parts.count == 2, parts.allSatisfy({ $0.count == 2 }),
+              let hour = Int(parts[0]), let minute = Int(parts[1]),
+              (0..<24).contains(hour), (0..<60).contains(minute) else { return nil }
+        return HourAndMinute(hour: hour, minute: minute)
+    }
+
+    /// A time picker's date, as its local time on `calendar`.
+    static func time(from date: Date, calendar: Calendar = .current) -> String {
+        let components = calendar.dateComponents([.hour, .minute], from: date)
+        return time(hour: components.hour ?? 0, minute: components.minute ?? 0)
+    }
+
+    /// A date at `time` today on `calendar`, for a time picker.
+    static func date(for time: String, calendar: Calendar = .current, now: Date = Date()) -> Date? {
+        guard let value = hourAndMinute(time) else { return nil }
+        return calendar.date(bySettingHour: value.hour, minute: value.minute, second: 0, of: now)
+    }
+}

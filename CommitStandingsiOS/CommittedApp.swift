@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 import UIKit
 
 @main
@@ -29,9 +30,13 @@ struct CommittedApp: App {
                 services: ScreenshotFixture.services(), backgroundTime: UIApplicationBackgroundTime(),
                 liveRankActivities: ScreenshotFixture.liveRankActivities(ActivityKitLiveRankActivities()),
                 liveRankPreferences: ScreenshotFixture.liveRankPreferences(),
-                liveRankRelay: makeLiveRankRelay(),
+                liveRankRelay: ScreenshotFixture.withoutRelay ? NoLiveRankRelay() : makeLiveRankRelay(),
                 avatars: ScreenshotFixture.avatars(),
                 widgets: WidgetPublisher(),
+                notificationPreferences: ScreenshotFixture.notificationPreferences(),
+                notificationAuthorization: ScreenshotFixture.notificationsDenied
+                    ? { .denied }
+                    : { await UNUserNotificationCenter.current().notificationSettings().authorizationStatus },
                 now: ScreenshotFixture.now
             )
             if let tab = ScreenshotFixture.requestedTab { model.selectedTab = tab }

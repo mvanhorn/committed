@@ -24,6 +24,10 @@ import UIKit
 /// `-ScreenshotCountScale <n>` multiplies everyone's counts by n (30 puts every 30-day count in
 /// the thousands beside the streaks, the board's widest rows), and
 /// `-LiveRankPayload <file.json>` shows a Live Activity push payload's content state in Live rank,
+/// `-ScreenshotNotifications` opens Settings ▸ Notifications (with `-ScreenshotTab settings`),
+/// `-ScreenshotPasses rivals` and `-ScreenshotQuietHours 23:30-07:00` (or `off`) set the board
+/// owner's notification choices, `-ScreenshotNotificationsDenied` reads iOS's permission as denied,
+/// `-ScreenshotNoRelay` runs a relay build as one without the relay,
 /// and `-RelayDisclosureAccepted` starts with the Committed relay disclosure already accepted (for
 /// builds with `COMMITTED_RELAY_URL`; without it, a relay build shows the disclosure sheet).
 ///
@@ -96,6 +100,35 @@ enum ScreenshotFixture {
     /// are pinned, as tapping it would. Honored on any Debug launch.
     static var explainsRivalLimit: Bool {
         ProcessInfo.processInfo.arguments.contains("-ScreenshotRivalLimit")
+    }
+
+    /// `-ScreenshotNotifications`: Settings opens on the Notifications screen.
+    static var opensNotifications: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotNotifications")
+    }
+
+    /// `-ScreenshotNotificationsDenied`: iOS's notification permission reads as denied.
+    static var notificationsDenied: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotNotificationsDenied")
+    }
+
+    /// `-ScreenshotNoRelay`: no Committed relay, even in a relay build.
+    static var withoutRelay: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotNoRelay")
+    }
+
+    /// The board owner's notification choices, in memory: the defaults, with `-ScreenshotPasses`
+    /// and `-ScreenshotQuietHours <start>-<end>|off` applied.
+    static func notificationPreferences() -> InMemoryNotificationPreferences {
+        var choices = NotificationPreferences()
+        if let passes = value(after: "-ScreenshotPasses").flatMap(NotificationPreferences.Passes.init(rawValue:)) {
+            choices.passes = passes
+        }
+        if let hours = value(after: "-ScreenshotQuietHours") {
+            let ends = hours.split(separator: "-").map(String.init)
+            choices.quietHours = ends.count == 2 ? .init(start: ends[0], end: ends[1]) : nil
+        }
+        return InMemoryNotificationPreferences([SampleServices.owner: choices])
     }
 
     /// Live rank settings for the fixture, in memory: never chosen, or accepted and on with

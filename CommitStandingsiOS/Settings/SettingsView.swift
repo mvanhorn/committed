@@ -1,16 +1,17 @@
 import SwiftUI
 
 /// The Settings tab. Each section is its own view so sections can be added without touching the
-/// others. Order follows the spec: Live rank, Leaderboard Notifications, About Committed, GitHub.
+/// others. Order follows the spec: Live rank, Notifications, About Committed, GitHub.
 /// The Mac-only items (Launch at Login, updates, Quit) don't exist on iPhone.
 ///
 /// Still a grouped `Form` (settings-shaped content stays native), set on the ink page with the
 /// site's tile rows and hairlines.
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
+    @State private var path = SettingsView.initialPath
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             Form {
                 Section { SettingsMasthead() }
                     .listRowBackground(Color.clear)
@@ -20,7 +21,7 @@ struct SettingsView: View {
                     // what someone trying it out is looking for.
                     if model.mode == .sampleBoard { GitHubAccountSection() }
                     LiveRankSection()
-                    LeaderboardNotificationsSection()
+                    NotificationsSection()
                     AboutCommittedSection()
                     if model.mode != .sampleBoard { GitHubAccountSection() }
                 }
@@ -32,7 +33,23 @@ struct SettingsView: View {
             .inkScreen()
             .readableContentWidth()
             .navigationTitle("Settings")
+            .navigationDestination(for: SettingsRoute.self) { route in
+                switch route {
+                case .notifications: NotificationsScreen()
+                }
+            }
         }
+    }
+}
+
+extension SettingsView {
+    /// Settings opens on its list, or in Debug on the Notifications screen for screenshots
+    /// (`-ScreenshotNotifications`).
+    fileprivate static var initialPath: [SettingsRoute] {
+        #if DEBUG
+        if ScreenshotFixture.opensNotifications { return [.notifications] }
+        #endif
+        return []
     }
 }
 
