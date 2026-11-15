@@ -10,6 +10,8 @@ import UIKit
 /// Optional, after `-ScreenshotFixture`: `-ScreenshotTab people|settings` opens on that tab,
 /// `-ScreenshotHide <login>` hides that person before the first refresh (so Today still moves),
 /// `-ScreenshotPin <login,login>` pins those people as rivals (Your rivals on the Board),
+/// `-ScreenshotRivalLimit` shows Rival's "You can pin up to 3 rivals" on a person view opened with
+/// three rivals already pinned, as a tap would,
 /// `-ScreenshotWindow <raw value>` opens the board on that Window (`monthly` for 30 days),
 /// `-ScreenshotDate <ISO 8601>` sets the app's clock, `-ScreenshotShare` opens Share board once the
 /// board has loaded,
@@ -74,6 +76,12 @@ enum ScreenshotFixture {
     /// Debug launch.
     static var opensShare: Bool {
         ProcessInfo.processInfo.arguments.contains("-ScreenshotShare")
+    }
+
+    /// `-ScreenshotRivalLimit`: a person view's Rival explains the limit on appear when three rivals
+    /// are pinned, as tapping it would. Honored on any Debug launch.
+    static var explainsRivalLimit: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotRivalLimit")
     }
 
     /// Live rank settings for the fixture, in memory: never chosen, or accepted and on with

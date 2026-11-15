@@ -108,9 +108,13 @@ struct RivalPinButton: View {
                     store.setPinned(true, username: person.login)
                 }
             } label: {
-                Label(pinned ? "Pinned" : "Rival", systemImage: pinned ? "pin.fill" : "pin")
-                    .labelStyle(.titleAndIcon)
-                    .contentTransition(.symbolEffect(.replace))
+                // The pin and its word, not a `Label`: a bar shows a label's icon alone, and the
+                // word is the state.
+                HStack(spacing: 5) {
+                    Image(systemName: pinned ? "pin.fill" : "pin")
+                        .contentTransition(.symbolEffect(.replace))
+                    Text(pinned ? "Pinned" : "Rival")
+                }
             }
             .tint(.lime)
             .sensoryFeedback(.selection, trigger: pinned)
@@ -127,6 +131,14 @@ struct RivalPinButton: View {
                     .padding(.vertical, 12)
                     .presentationCompactAdaptation(.popover)
             }
+            #if DEBUG
+            .task {
+                // After the push settles, so the popover has a bar button to point at.
+                guard ScreenshotFixture.explainsRivalLimit else { return }
+                try? await Task.sleep(for: .seconds(4))
+                if !store.isPinned(person.login) && !store.canPinAnotherRival { explainingLimit = true }
+            }
+            #endif
         }
     }
 
@@ -148,6 +160,9 @@ struct PersonDestination: View {
                             ToolbarItem(placement: .topBarTrailing) {
                                 RivalPinButton(person: person)
                             }
+                            // Beside GitHub with its words on iPhone Duo too: in the vertical bar it
+                            // would be a bare pin, and "Rival" / "Pinned" is the state.
+                            .axisBehavior(.horizontalOnly)
                         }
                         ToolbarItem(placement: .topBarTrailing) {
                             PersonProfileLink(person: person)
