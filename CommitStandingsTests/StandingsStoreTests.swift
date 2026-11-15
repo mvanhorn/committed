@@ -78,6 +78,111 @@ struct StandingsStoreTests {
         #expect(persistence.load().isEmpty)
     }
 
+    // MARK: - Pinned rivals
+
+    @Test func pinnedRivalsPersistLocallyAcrossRelaunchAndAccountSwitch() throws {
+        let suite = "pinned-rivals-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let people = UserDefaultsCompetitorPersistence(defaults: defaults)
+        let store = StandingsStore(persistence: people,
+                                   pinnedRivalsPersistence: UserDefaultsPinnedRivalsPersistence(defaults: defaults))
+        store.replaceRoster(owner: "first-account", members: ["odile-m", "ezra-q"])
+        #expect(store.setPinned(true, username: "@Ezra-Q"))
+        #expect(store.setPinned(true, username: "odile-m"))
+        #expect(store.isPinned("ezra-q"))
+
+        let relaunched = StandingsStore(persistence: people,
+                                        pinnedRivalsPersistence: UserDefaultsPinnedRivalsPersistence(defaults: defaults))
+        // In the order they were pinned.
+        #expect(relaunched.pinnedRivals.map(\.username) == ["ezra-q", "odile-m"])
+        // Disconnect GitHub clears the roster but keeps each account's pins.
+        relaunched.reset()
+        relaunched.replaceRoster(owner: "second-account", members: ["odile-m", "ezra-q"])
+        #expect(relaunched.pinnedRivals.isEmpty)
+        #expect(!relaunched.isPinned("ezra-q"))
+        relaunched.reset()
+        relaunched.replaceRoster(owner: "first-account", members: ["odile-m", "ezra-q"])
+        #expect(relaunched.pinnedRivals.map(\.username) == ["ezra-q", "odile-m"])
+        #expect(relaunched.setPinned(false, username: "ezra-q"))
+        let unpinned = StandingsStore(persistence: people,
+                                      pinnedRivalsPersistence: UserDefaultsPinnedRivalsPersistence(defaults: defaults))
+        #expect(unpinned.pinnedRivals.map(\.username) == ["odile-m"])
+    }
+
+    @Test func atMostThreeRivalsArePinned() {
+        let persistence = InMemoryPinnedRivalsPersistence()
+        let store = StandingsStore(persistence: InMemoryCompetitorPersistence(), pinnedRivalsPersistence: persistence)
+        store.replaceRoster(owner: "me", members: ["a", "b", "c", "d"])
+        #expect(store.canPinAnotherRival)
+        for login in ["a", "b", "c"] { #expect(store.setPinned(true, username: login)) }
+        #expect(!store.canPinAnotherRival)
+        #expect(!store.setPinned(true, username: "d"))
+        #expect(!store.isPinned("d"))
+        #expect(store.pinnedRivals.map(\.username) == ["a", "b", "c"])
+        #expect(persistence.load()["me"] == ["a", "b", "c"])
+        // Unpinning frees a place.
+        #expect(store.setPinned(false, username: "b"))
+        #expect(store.setPinned(true, username: "d"))
+        #expect(store.pinnedRivals.map(\.username) == ["a", "c", "d"])
+    }
+
+    @Test func cannotPinYourselfOrSomeoneNotOnTheBoard() {
+        let persistence = InMemoryPinnedRivalsPersistence()
+        let store = StandingsStore(persistence: InMemoryCompetitorPersistence(), pinnedRivalsPersistence: persistence)
+        store.replaceRoster(owner: "me", members: ["friend"])
+        #expect(!store.setPinned(true, username: "me"))
+        #expect(!store.setPinned(true, username: "stranger"))
+        store.setHidden(true, username: "friend")
+        #expect(!store.setPinned(true, username: "friend"))
+        #expect(store.pinnedRivals.isEmpty)
+        #expect(persistence.load().isEmpty)
+    }
+
+    @Test func hidingAPinnedRivalUnpinsThem() {
+        let persistence = InMemoryPinnedRivalsPersistence()
+        let store = StandingsStore(persistence: InMemoryCompetitorPersistence(), pinnedRivalsPersistence: persistence)
+        store.replaceRoster(owner: "me", members: ["odile-m", "ezra-q"])
+        store.setPinned(true, username: "odile-m")
+        store.setPinned(true, username: "ezra-q")
+        store.setHidden(true, username: "odile-m")
+        #expect(!store.isPinned("odile-m"))
+        #expect(store.pinnedRivals.map(\.username) == ["ezra-q"])
+        #expect(persistence.load()["me"] == ["ezra-q"])
+        // Showing them again doesn't pin them again.
+        store.setHidden(false, username: "odile-m")
+        #expect(store.pinnedRivals.map(\.username) == ["ezra-q"])
+    }
+
+    @Test func aPinnedRivalWhoLeavesTheBoardStaysPinnedAndComesBack() {
+        let store = StandingsStore(persistence: InMemoryCompetitorPersistence())
+        store.replaceRoster(owner: "me", members: ["odile-m", "ezra-q"])
+        store.setPinned(true, username: "odile-m")
+        store.setPinned(true, username: "ezra-q")
+        store.replaceRoster(owner: "me", members: ["ezra-q"])
+        #expect(store.pinnedRivals.map(\.username) == ["ezra-q"])
+        #expect(store.isPinned("odile-m"))
+        store.replaceRoster(owner: "me", members: ["odile-m", "ezra-q"])
+        #expect(store.pinnedRivals.map(\.username) == ["odile-m", "ezra-q"])
+    }
+
+    /// Someone who left can't be unpinned from their view, so they never hold one of the three
+    /// places: pinning a third person on the board forgets the earliest pin who's gone. The saved
+    /// list (what the relay receives as `rivals`) never passes three.
+    @Test func aRivalWhoLeftGivesUpTheirPlaceWhenItsNeeded() {
+        let persistence = InMemoryPinnedRivalsPersistence()
+        let store = StandingsStore(persistence: InMemoryCompetitorPersistence(), pinnedRivalsPersistence: persistence)
+        store.replaceRoster(owner: "me", members: ["a", "b", "c", "d"])
+        for login in ["a", "b", "c"] { store.setPinned(true, username: login) }
+        store.replaceRoster(owner: "me", members: ["b", "c", "d"])
+        #expect(store.canPinAnotherRival)
+        #expect(store.setPinned(true, username: "d"))
+        #expect(store.pinnedRivals.map(\.username) == ["b", "c", "d"])
+        #expect(persistence.load()["me"] == ["b", "c", "d"])
+        store.replaceRoster(owner: "me", members: ["a", "b", "c", "d"])
+        #expect(!store.isPinned("a"))
+    }
+
     @Test func sourceFiltersDeduplicateAndKeepHiddenPeopleAvailable() {
         let roster = GitHubRosterSnapshot(owner: "me", sources: [
             GitHubRosterSource(id: "org:current", title: "current", members: ["me", "Org-Only", "both"]),

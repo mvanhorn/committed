@@ -9,6 +9,7 @@ import UIKit
 ///
 /// Optional, after `-ScreenshotFixture`: `-ScreenshotTab people|settings` opens on that tab,
 /// `-ScreenshotHide <login>` hides that person before the first refresh (so Today still moves),
+/// `-ScreenshotPin <login,login>` pins those people as rivals (Your rivals on the Board),
 /// `-ScreenshotWindow <raw value>` opens the board on that Window (`monthly` for 30 days),
 /// `-ScreenshotDate <ISO 8601>` sets the app's clock, `-ScreenshotShare` opens Share board once the
 /// board has loaded,
@@ -179,7 +180,8 @@ enum ScreenshotFixture {
     }
 
     /// The Sample board's services (`SampleServices`) with the fixture's extras: one person who
-    /// always fails to load, `-ScreenshotRestrictedOrg <name>` and `-ScreenshotHide <login>`. It
+    /// always fails to load, `-ScreenshotRestrictedOrg <name>`, `-ScreenshotHide <login>` and
+    /// `-ScreenshotPin <login,login>`. It
     /// loads at once, refreshing twice so Today shows movement chevrons.
     ///
     /// `extraPeople` adds that many followed people (`sample-pal-01`, …) below everyone else, for a
@@ -195,15 +197,21 @@ enum ScreenshotFixture {
             countScale: value(after: "-ScreenshotCountScale").flatMap(Int.init).map { max(1, $0) } ?? 1
         ), now: now)
         let hide = value(after: "-ScreenshotHide")
+        let pins = value(after: "-ScreenshotPin")?.split(separator: ",").map(String.init) ?? []
         // `-ScreenshotWindow monthly`: the board opens on that Window (a raw value).
         if let window = value(after: "-ScreenshotWindow").flatMap(ContributionWindow.init(rawValue:)) {
             services.store.selectedWindow = window
         }
         Task {
             await services.auth.refreshIdentity()
-            if let hide {
+            if hide != nil || !pins.isEmpty {
                 await services.roster.refresh(force: true)
+            }
+            if let hide {
                 services.store.setHidden(true, username: hide)
+            }
+            for login in pins {
+                services.store.setPinned(true, username: login)
             }
             // Two refreshes on the same day: the first sets today's baseline, the second moves.
             await services.refresh.refreshAll(reason: .manual)

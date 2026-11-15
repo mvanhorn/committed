@@ -87,8 +87,54 @@ struct PersonProfileLink: View {
     }
 }
 
-/// The person view pushed onto the Board: back to the Board on the leading side, their GitHub
-/// profile on the trailing side, and the tab bar still there.
+/// Rival, in the bar beside GitHub on someone else's view: a pin labelled "Rival", or "Pinned" when
+/// on, read as "Rival" or "Rival, pinned". With three rivals pinned it stays tappable and explains
+/// the limit instead, offering no replacement. Your own view has none.
+struct RivalPinButton: View {
+    @Environment(StandingsStore.self) private var store
+    let person: PersonSummary
+    @State private var explainingLimit = false
+
+    var body: some View {
+        if !person.isYou {
+            let pinned = store.isPinned(person.login)
+            let atLimit = !pinned && !store.canPinAnotherRival
+            Button {
+                if pinned {
+                    store.setPinned(false, username: person.login)
+                } else if atLimit {
+                    explainingLimit = true
+                } else {
+                    store.setPinned(true, username: person.login)
+                }
+            } label: {
+                Label(pinned ? "Pinned" : "Rival", systemImage: pinned ? "pin.fill" : "pin")
+                    .labelStyle(.titleAndIcon)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .tint(.lime)
+            .sensoryFeedback(.selection, trigger: pinned)
+            .accessibilityLabel("Rival")
+            .accessibilityInputLabels(["Rival", "Pinned"])
+            .accessibilityValue(pinned ? "pinned" : "")
+            .accessibilityHint(pinned ? "Unpins \(person.login) from Your rivals"
+                               : atLimit ? Self.limitMessage
+                               : "Pins \(person.login) to Your rivals on the Board")
+            .popover(isPresented: $explainingLimit) {
+                Text(Self.limitMessage)
+                    .font(.callout)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .presentationCompactAdaptation(.popover)
+            }
+        }
+    }
+
+    static let limitMessage = "You can pin up to \(StandingsStore.maxPinnedRivals) rivals"
+}
+
+/// The person view pushed onto the Board: back to the Board on the leading side, Rival and their
+/// GitHub profile on the trailing side, and the tab bar still there.
 struct PersonDestination: View {
     @Environment(AppModel.self) private var model
 
@@ -98,6 +144,11 @@ struct PersonDestination: View {
                 PersonScreen(person: person)
                     .navigationTitle(person.isYou ? "Your month" : "\(person.login)’s month")
                     .toolbar {
+                        if !person.isYou {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                RivalPinButton(person: person)
+                            }
+                        }
                         ToolbarItem(placement: .topBarTrailing) {
                             PersonProfileLink(person: person)
                         }
@@ -112,7 +163,7 @@ struct PersonDestination: View {
 }
 
 /// The person view in the second pane on the open iPhone Duo, where your summary otherwise sits,
-/// with a button back to your summary and their GitHub profile.
+/// with a button back to your summary, Rival and their GitHub profile.
 struct PersonPane: View {
     @Environment(AppModel.self) private var model
     let person: PersonSummary
@@ -129,8 +180,11 @@ struct PersonPane: View {
                 .tint(.lime)
                 .accessibilityHint("Closes \(person.login)’s month")
                 Spacer()
-                PersonProfileLink(person: person)
-                    .font(.callout.weight(.semibold))
+                HStack(spacing: 18) {
+                    RivalPinButton(person: person)
+                    PersonProfileLink(person: person)
+                }
+                .font(.callout.weight(.semibold))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
