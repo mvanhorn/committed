@@ -139,6 +139,9 @@ struct RelayNotificationsTests {
         #expect(!model.isShowingRelayNotificationsConsent)
         #expect(model.relayNotificationsOn)
         #expect(preferences.load().relayDisclosureVersion == RelayConsent.currentVersion)
+        // The relay hears about notifications straight away, not at the next refresh.
+        #expect(lastNotifications == .some(RelayNotificationsConfiguration(preferences: NotificationPreferences())))
+        #expect(remote.requests > 0)
     }
 
     @Test func notNowInTheRelaySheetDoesntAskAgainStraightAway() async {

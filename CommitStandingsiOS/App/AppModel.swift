@@ -367,6 +367,9 @@ final class AppModel {
     func acceptLiveRankDisclosure() async {
         liveRankDisclosureRequested = false
         await liveRank.acceptRelayDisclosure()
+        // The sheet also agreed to relay notifications: with Leaderboard Notifications on, they
+        // start now.
+        await syncRelayNotifications()
         await refreshLiveRankIfStale()
     }
 
