@@ -117,8 +117,8 @@ Registers or updates. `{id}` is 8 to 64 characters of `[A-Za-z0-9-]`; a UUID wor
 - Turning `liveRank` off ends the current activity and forgets Live rank's tokens. The relay
   keeps the alert token only while `notifications` is set.
 - Passes act on `window`, `passes` (`"rivals"` sends only pinned rivals' passes) and quiet hours
-  (#130). `delivery` and the kinds after passes are stored now and take effect in later tickets
-  (#131–#135).
+  (#130); close calls on `closeCalls`, `window`, `rivals` and quiet hours (#132). `delivery` and
+  the other kinds are stored now and take effect in later tickets (#131, #133–#135).
 - At most 1,000 competitors, self included.
 - Returns `201` on creation, `200` on update.
 - A changed competitor list resets today's movement baseline, as a visibility change does in
@@ -494,6 +494,27 @@ WIDGET_SCREENS=/some/dir npm run test:browser   # also save a screenshot of each
        },
        "kind": "pass",
        "login": "alice"
+     }
+     ```
+
+   - **Close calls** (`closeCalls.ts`, with `closeCalls: true`): you're 1 to
+     `max(3, ceil(5% of their count))` contributions behind someone, on the preferences' Window.
+     With `rivals` pinned, each pinned rival you're that close behind (even with someone in
+     between); with nobody pinned, only the person directly above you (`order`, you first among
+     ties). At most one per person per local day (`{"closeCalls": {"date", "sent": [logins]}}`),
+     and none during quiet hours: one still close when they end goes out then. They run with
+     `passes: "off"` too. `sendCloseCallsNow` is the immediate-delivery step; summary delivery
+     (#135) holds them for the evening summary instead. Each is one alert push,
+     `apns-collapse-id: closeCall.<login>`; a tap opens that person's view:
+
+     ```json
+     {
+       "aps": {
+         "alert": { "title": "Close call: 2 to pass odile-m", "body": "You're at 31, they're at 33 · Today" },
+         "sound": "default", "thread-id": "closeCalls"
+       },
+       "kind": "closeCall",
+       "login": "odile-m"
      }
      ```
 

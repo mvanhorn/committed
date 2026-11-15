@@ -34,9 +34,9 @@ export interface AlertPayload {
     /** "passive" delivers without sound or lighting the screen (quiet hours). */
     "interruption-level"?: "passive" | "active";
   };
-  /** Which kind of relay notification: "pass", … */
+  /** Which kind of relay notification: "pass", "closeCall", … */
   kind: string;
-  /** The rival it's about (a pass's), which the app opens on tap. */
+  /** The rival it's about (a pass's or close call's), which the app opens on tap. */
   login?: string;
 }
 

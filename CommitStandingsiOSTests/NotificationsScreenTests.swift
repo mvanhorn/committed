@@ -129,6 +129,19 @@ struct NotificationsScreenTests {
         #expect(lastNotifications?.preferences.quietHours == .init(start: "22:00", end: "08:00"))
     }
 
+    @Test func closeCallsStartOffAndTurningThemOnIsSavedAndReachesTheRelay() async {
+        agreedToRelayNotifications()
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+        #expect(model.notificationChoices.closeCalls == false)
+
+        await model.updateNotificationChoices { $0.closeCalls = true }
+
+        #expect(model.notificationChoices.closeCalls)
+        #expect(choices.load(account: "me").closeCalls)
+        #expect(lastNotifications?.preferences.closeCalls == true)
+    }
+
     /// Today's gate (see `NotificationsScreen`): relay notifications follow the Passes switch, so a
     /// choice made with Passes off is saved but the relay hears notifications off.
     @Test func withPassesOffTheRelayHearsNotificationsOff() async {
