@@ -73,6 +73,12 @@ enum ScreenshotFixture {
         ProcessInfo.processInfo.arguments.contains("-ScreenshotPersonEnd")
     }
 
+    /// `-ScreenshotSheetEnd`: the relay sheets open scrolled to their end, so captures on the closed
+    /// iPhone Duo show their last lines (the notifications line).
+    static var sheetScrolledToEnd: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotSheetEnd")
+    }
+
     /// `-ScreenshotConnect`: start Connect GitHub on launch, as a tap would, so captures can show
     /// its code (for example over the Sample board). Honored on any Debug launch. It asks GitHub
     /// for a real device code; nothing connects unless someone approves it.
@@ -100,12 +106,19 @@ enum ScreenshotFixture {
     }
 
     /// Live rank settings for the fixture, in memory: never chosen, or accepted and on with
-    /// `-RelayDisclosureAccepted`.
+    /// `-RelayDisclosureAccepted` (the earlier sheet, as 1.0.x saved it). Add
+    /// `-RelayNotificationsAccepted` to have agreed to relay notifications too. With Leaderboard
+    /// Notifications on (`-notifyOnPositionChange YES`), the earlier sheet alone shows "Get
+    /// notifications with Committed closed?".
     static func liveRankPreferences() -> InMemoryLiveRankPreferences {
-        guard ProcessInfo.processInfo.arguments.contains("-RelayDisclosureAccepted") else {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("-RelayDisclosureAccepted") else {
             return InMemoryLiveRankPreferences()
         }
-        return InMemoryLiveRankPreferences(LiveRankPreferences(isEnabled: true, relayDisclosureAccepted: true))
+        let notifications: Bool? = arguments.contains("-RelayNotificationsAccepted") ? true : nil
+        return InMemoryLiveRankPreferences(LiveRankPreferences(
+            isEnabled: true, relayDisclosureAccepted: true, relayNotifications: notifications
+        ))
     }
 
     private static func value(after flag: String) -> String? {

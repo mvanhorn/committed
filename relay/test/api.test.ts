@@ -178,3 +178,144 @@ describe("DELETE /v1/installations/{id}", () => {
     expect(await row()).not.toBeNull();
   });
 });
+
+// Spec #124: relay notifications. The new keys are optional, so the live 1.0.x apps' bodies
+// (exactly `registration` above) keep working.
+describe("PUT /v1/installations/{id}: Live rank and relay notifications", () => {
+  const ALERT = "e7".repeat(32);
+  const defaults = {
+    window: "daily",
+    passes: "everyone",
+    closeCalls: false,
+    results: true,
+    records: true,
+    streakReminder: false,
+    delivery: "summary",
+    quietHours: { start: "22:00", end: "08:00" },
+  };
+  const withNotifications = {
+    ...registration,
+    liveRank: false,
+    alertToken: ALERT,
+    notifications: defaults,
+    rivals: ["alice"],
+  };
+
+  it("treats a 1.0.x body as Live rank on with no notifications", async () => {
+    expect((await call("PUT", `/v1/installations/${ID}`, registration)).status).toBe(201);
+    const stored = await row();
+    expect(stored!.live_rank).toBe(1);
+    expect(stored!.alert_token).toBeNull();
+    expect(stored!.notifications_json).toBeNull();
+    expect(JSON.parse(stored!.rivals_json as string)).toEqual([]);
+  });
+
+  it("stores Live rank, the alert token, the preferences and pinned rivals", async () => {
+    expect((await call("PUT", `/v1/installations/${ID}`, withNotifications)).status).toBe(201);
+    const stored = await row();
+    expect(stored!.live_rank).toBe(0);
+    expect(stored!.alert_token).toBe(ALERT);
+    expect(JSON.parse(stored!.notifications_json as string)).toEqual(defaults);
+    expect(JSON.parse(stored!.rivals_json as string)).toEqual(["alice"]);
+  });
+
+  it("fills missing preferences with the defaults, and accepts quiet hours off", async () => {
+    await call("PUT", `/v1/installations/${ID}`, { ...withNotifications, notifications: { passes: "rivals", quietHours: null } });
+    expect(JSON.parse((await row())!.notifications_json as string)).toEqual({ ...defaults, passes: "rivals", quietHours: null });
+  });
+
+  it("accepts notifications before iOS has issued an alert token", async () => {
+    expect((await call("PUT", `/v1/installations/${ID}`, { ...withNotifications, alertToken: null })).status).toBe(201);
+    expect((await row())!.alert_token).toBeNull();
+  });
+
+  it("turning notifications off forgets the preferences and the alert token", async () => {
+    await call("PUT", `/v1/installations/${ID}`, { ...withNotifications, liveRank: true });
+    await call("PUT", `/v1/installations/${ID}`, { ...registration, liveRank: true, notifications: null, alertToken: null });
+    const stored = await row();
+    expect(stored!.notifications_json).toBeNull();
+    expect(stored!.alert_token).toBeNull();
+  });
+
+  it("answers an error code for each bad field", async () => {
+    const cases: [Record<string, unknown>, string][] = [
+      [{ liveRank: "yes" }, "invalid_live_rank"],
+      [{ alertToken: "not-hex" }, "invalid_alert_token"],
+      [{ notifications: "on" }, "invalid_notifications"],
+      [{ notifications: { ...defaults, sound: true } }, "unknown_field:notifications.sound"],
+      [{ notifications: { window: "yearly" } }, "invalid_notifications_window"],
+      [{ notifications: { passes: "some" } }, "invalid_notifications_passes"],
+      [{ notifications: { closeCalls: 1 } }, "invalid_notifications_close_calls"],
+      [{ notifications: { results: "true" } }, "invalid_notifications_results"],
+      [{ notifications: { records: null } }, "invalid_notifications_records"],
+      [{ notifications: { streakReminder: "no" } }, "invalid_notifications_streak_reminder"],
+      [{ notifications: { delivery: "later" } }, "invalid_notifications_delivery"],
+      [{ notifications: { quietHours: { start: "22:00" } } }, "invalid_quiet_hours"],
+      [{ notifications: { quietHours: { start: "25:00", end: "08:00" } } }, "invalid_quiet_hours"],
+      [{ notifications: { quietHours: { start: "22:00", end: "8:00" } } }, "invalid_quiet_hours"],
+      [{ rivals: "alice" }, "invalid_rivals"],
+      [{ rivals: ["alice", "bob", "carol", "dave"] }, "too_many_rivals"],
+      [{ rivals: ["zed"] }, "unknown_rival"],
+    ];
+    for (const [fields, error] of cases) {
+      const res = await call("PUT", `/v1/installations/${ID}`, { ...withNotifications, ...fields });
+      expect(res.status, error).toBe(400);
+      expect(await res.json(), error).toEqual({ error });
+    }
+    expect(await row()).toBeNull();
+  });
+
+  it("normalizes pinned rivals like the board, and allows at most three", async () => {
+    const res = await call("PUT", `/v1/installations/${ID}`, {
+      ...withNotifications,
+      competitors: ["me", "alice", "bob", "carol"],
+      rivals: ["@Alice", "BOB", "carol"],
+    });
+    expect(res.status).toBe(201);
+    expect(JSON.parse((await row())!.rivals_json as string)).toEqual(["alice", "bob", "carol"]);
+  });
+
+  it("deletes the installation, ending Live rank, when both features are off", async () => {
+    await call("PUT", `/v1/installations/${ID}`, registration);
+    await call("PUT", `/v1/installations/${ID}/activity`, { activityId: "act-1", pushToken: ACTIVITY_TOKEN });
+    const res = await call("PUT", `/v1/installations/${ID}`, { ...registration, liveRank: false, notifications: null });
+    expect(res.status).toBe(204);
+    expect(await row()).toBeNull();
+    expect(apns.events()).toEqual([`end:${ACTIVITY_TOKEN}`]);
+  });
+
+  it("never creates an installation with both features off", async () => {
+    const res = await call("PUT", `/v1/installations/${ID}`, { ...registration, liveRank: false });
+    expect(res.status).toBe(204);
+    expect(await row()).toBeNull();
+  });
+
+  it("turning Live rank off ends its activity and forgets its tokens", async () => {
+    await call("PUT", `/v1/installations/${ID}`, withNotifications);
+    await call("PUT", `/v1/installations/${ID}`, { ...withNotifications, liveRank: true });
+    await call("PUT", `/v1/installations/${ID}/activity`, { activityId: "act-1", pushToken: ACTIVITY_TOKEN });
+    await call("PUT", `/v1/installations/${ID}`, withNotifications);
+    const stored = await row();
+    expect(stored!.live_rank).toBe(0);
+    expect(stored!.activity_push_token).toBeNull();
+    expect(stored!.push_to_start_token).toBeNull();
+    expect(apns.events()).toEqual([`end:${ACTIVITY_TOKEN}`]);
+  });
+});
+
+describe("migration 0004", () => {
+  it("gives rows from before it Live rank on and no notifications", async () => {
+    // Exactly the columns the 1.0.x Worker's INSERT names.
+    await env.DB.prepare(
+      `INSERT INTO installations (id, secret_hash, apns_environment, push_to_start_token, login,
+         competitors_json, window, time_zone, rate_window_start, rate_count, created_at, updated_at)
+       VALUES (?, 'h', 'sandbox', NULL, 'me', '["me"]', 'daily', 'UTC', 0, 0, 0, 0)`,
+    ).bind(ID).run();
+    const stored = await row();
+    expect(stored!.live_rank).toBe(1);
+    expect(stored!.notifications_json).toBeNull();
+    expect(stored!.alert_token).toBeNull();
+    expect(stored!.notification_state).toBeNull();
+    expect(JSON.parse(stored!.rivals_json as string)).toEqual([]);
+  });
+});

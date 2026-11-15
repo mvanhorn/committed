@@ -3,11 +3,12 @@ import UIKit
 import UserNotifications
 
 /// Leaderboard Notifications: a crossing notification when someone passes you or you pass them,
-/// checked on every refresh. Turning it on shows the iOS permission prompt and switches back off
+/// checked on every refresh, or sent by the Committed relay with the app closed once relay
+/// notifications are agreed to. Turning it on shows the iOS permission prompt and switches back off
 /// if permission is denied. If iOS Settings has notifications off for Committed, the footer says
 /// so and links there.
 struct LeaderboardNotificationsSection: View {
-    @Environment(NotificationService.self) private var notifications
+    @Environment(AppModel.self) private var model
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(NotificationService.enabledDefaultsKey) private var isOn = false
@@ -20,10 +21,13 @@ struct LeaderboardNotificationsSection: View {
                 get: { isOn },
                 set: { enabled in
                     isOn = enabled
-                    guard enabled else { return }
+                    guard enabled else {
+                        Task { await model.leaderboardNotificationsChanged(false) }
+                        return
+                    }
                     requestingAuthorization = true
                     Task {
-                        await notifications.setEnabled(true)
+                        await model.leaderboardNotificationsChanged(true)
                         requestingAuthorization = false
                         await checkSystemSetting()
                     }
@@ -45,6 +49,8 @@ struct LeaderboardNotificationsSection: View {
                     }
                     .font(.footnote.weight(.semibold))
                 }
+            } else if model.relayNotificationsOn {
+                Text("Get notified when someone passes you or you pass them, even with Committed closed. The Committed relay sends them.")
             } else {
                 Text("Get notified when someone passes you or you pass them.")
             }

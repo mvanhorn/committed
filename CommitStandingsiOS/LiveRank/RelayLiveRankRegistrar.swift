@@ -55,15 +55,26 @@ struct RelayRegistration: Equatable, Sendable, Encodable {
     var pushToStartToken: String?
     var login: String
     var competitors: [String]
+    /// Live rank's Window.
     var window: String
     var timeZone: String
     var apnsEnvironment: String
+    /// Live rank on. Off, the relay never starts, updates or rotates a Live Activity.
+    var liveRank: Bool = true
+    /// The APNs device token relay notifications go to; nil until iOS issues one, or with them off.
+    var alertToken: String?
+    /// Nil = relay notifications off.
+    var notifications: NotificationPreferences?
+    /// Pinned rivals, each on `competitors`.
+    var rivals: [String] = []
 
     private enum CodingKeys: String, CodingKey {
         case pushToStartToken, login, competitors, window, timeZone, apnsEnvironment
+        case liveRank, alertToken, notifications, rivals
     }
 
-    // The relay expects `pushToStartToken: null` until iOS issues one, not a missing key.
+    // The relay expects `null` for a token iOS hasn't issued, or notifications that are off, not a
+    // missing key.
     func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(pushToStartToken, forKey: .pushToStartToken)
@@ -72,6 +83,10 @@ struct RelayRegistration: Equatable, Sendable, Encodable {
         try container.encode(window, forKey: .window)
         try container.encode(timeZone, forKey: .timeZone)
         try container.encode(apnsEnvironment, forKey: .apnsEnvironment)
+        try container.encode(liveRank, forKey: .liveRank)
+        try container.encode(alertToken, forKey: .alertToken)
+        try container.encode(notifications, forKey: .notifications)
+        try container.encode(rivals, forKey: .rivals)
     }
 }
 
@@ -101,18 +116,20 @@ protocol LiveRankTokenReceiving: AnyObject {
     func activityPushTokenDidChange(activityID: String, token: Data) async
 }
 
-/// Phase 2: the Committed relay keeps Live rank current while the app is closed.
+/// Phase 2: the Committed relay keeps Live rank current while the app is closed, and sends relay
+/// notifications (#124).
 ///
-/// `LiveRankController` tells it the board (`LiveRankConfiguration`) whenever it changes, and nil
-/// when Live rank turns off or GitHub disconnects. ActivityKit's token streams arrive through
-/// `LiveRankTokenReceiving`. Everything funnels into one `flush()` that brings the relay in line:
-/// register when the registration body changed (board, push-to-start token, time zone), report
-/// each activity's push token once it's registered, and delete the registration when there's no
-/// board. A failed call leaves the work pending; the next trigger or `retryPendingWork()` tries
-/// again. Nothing is sent when nothing changed, which keeps well inside the relay's 30 writes per
-/// 10 minutes.
+/// `LiveRankController` tells it the board (`LiveRankConfiguration`, with Live rank on or off)
+/// whenever it changes, and nil when GitHub disconnects. `AppModel` tells it the relay notification
+/// choices. ActivityKit's token streams arrive through `LiveRankTokenReceiving`, the alert token
+/// through `AlertTokenReceiving`. Everything funnels into one `flush()` that brings the relay in
+/// line: register when the registration body changed (board, tokens, time zone, choices), report
+/// each activity's push token once it's registered, and delete the registration when GitHub
+/// disconnects or both Live rank and relay notifications are off. A failed call leaves the work
+/// pending; the next trigger or `retryPendingWork()` tries again. Nothing is sent when nothing
+/// changed, which keeps well inside the relay's 30 writes per 10 minutes.
 @MainActor
-final class RelayLiveRankRegistrar: LiveRankRegistrar, LiveRankTokenReceiving {
+final class RelayLiveRankRegistrar: LiveRankRegistrar, LiveRankTokenReceiving, AlertTokenReceiving {
     private let api: any LiveRankRelayAPI
     private let installations: any RelayInstallationStoring
     private let apnsEnvironment: RelayAPNsEnvironment
@@ -121,8 +138,12 @@ final class RelayLiveRankRegistrar: LiveRankRegistrar, LiveRankTokenReceiving {
 
     /// The board to register; nil until the controller first reports (a cold launch).
     private var configuration: LiveRankConfiguration?
-    /// Live rank is off or GitHub disconnected: delete the registration.
-    private var isTurnedOff = false
+    /// GitHub disconnected: delete the registration.
+    private var isSignedOut = false
+    /// Relay notifications: `.none` until the app first says (a cold launch), then on (choices) or
+    /// off (nil). With Live rank off, the registration isn't deleted until this is known.
+    private var notifications: RelayNotificationsConfiguration??
+    private var alertToken: String?
     private var pushToStartToken: String?
     /// The last registration the relay accepted in this process.
     private var lastRegistered: RelayRegistration?
@@ -163,9 +184,26 @@ final class RelayLiveRankRegistrar: LiveRankRegistrar, LiveRankTokenReceiving {
 
     func liveRankDidChange(_ configuration: LiveRankConfiguration?) async {
         self.configuration = configuration
-        isTurnedOff = configuration == nil
-        if isTurnedOff { pendingActivities.removeAll() }
+        isSignedOut = configuration == nil
+        if isLiveRankOff { pendingActivities.removeAll() }
         await flush()
+    }
+
+    func relayNotificationsDidChange(_ configuration: RelayNotificationsConfiguration?) async {
+        notifications = .some(configuration)
+        await flush()
+    }
+
+    func alertTokenDidChange(_ token: Data) async {
+        alertToken = token.lowercaseHex
+        await flush()
+    }
+
+    /// The relay accepted a registration with notifications and an alert token.
+    private(set) var deliversNotifications = false
+
+    private var isLiveRankOff: Bool {
+        isSignedOut || configuration?.liveRank == false
     }
 
     func retryPendingWork() async {
@@ -180,9 +218,9 @@ final class RelayLiveRankRegistrar: LiveRankRegistrar, LiveRankTokenReceiving {
     }
 
     func activityPushTokenDidChange(activityID: String, token: Data) async {
-        // Live rank is off: the relay has no registration to attach it to. Before the controller
+        // Live rank is off: the relay has no activity to attach it to. Before the controller
         // has reported at all (a cold launch), hold the token until the board is known.
-        guard !isTurnedOff else { return }
+        guard !isLiveRankOff else { return }
         let hex = token.lowercaseHex
         guard reportedActivities[activityID] != hex else { return }
         pendingActivities.removeAll { $0.id == activityID }
@@ -217,12 +255,26 @@ final class RelayLiveRankRegistrar: LiveRankRegistrar, LiveRankTokenReceiving {
     }
 
     private func flushOnce() async {
-        if isTurnedOff {
+        if isSignedOut {
             await unregisterIfNeeded()
             return
         }
         if let configuration {
+            if !configuration.liveRank {
+                switch notifications {
+                case .none:
+                    // Not known yet: neither register nor delete until the app says.
+                    return
+                case .some(.none):
+                    // Both off.
+                    await unregisterIfNeeded()
+                    return
+                case .some(.some):
+                    break
+                }
+            }
             guard await register(configuration) else { return }
+            guard configuration.liveRank else { return }
         } else {
             // No board yet: a background launch, for example when the relay started an activity by
             // push-to-start. If the relay holds this installation from an earlier launch, report
@@ -240,6 +292,7 @@ final class RelayLiveRankRegistrar: LiveRankRegistrar, LiveRankTokenReceiving {
                 // The relay lost the registration (deleted elsewhere, or a fresh database):
                 // register again once the board is known, then report.
                 lastRegistered = nil
+                deliversNotifications = false
                 installation.isRegistered = false
                 installations.save(installation)
                 return
@@ -260,13 +313,20 @@ final class RelayLiveRankRegistrar: LiveRankRegistrar, LiveRankTokenReceiving {
             installations.save(new)
             return new
         }()
+        let notifications = self.notifications ?? nil
         let registration = RelayRegistration(
-            pushToStartToken: pushToStartToken,
+            // Live rank's tokens only while it's on, the alert token only while notifications are.
+            pushToStartToken: configuration.liveRank ? pushToStartToken : nil,
             login: configuration.selfLogin,
             competitors: configuration.competitors,
             window: configuration.window.rawValue,
             timeZone: timeZone().identifier,
-            apnsEnvironment: apnsEnvironment.rawValue
+            apnsEnvironment: apnsEnvironment.rawValue,
+            liveRank: configuration.liveRank,
+            alertToken: notifications == nil ? nil : alertToken,
+            notifications: notifications?.preferences,
+            // Only people on the board: the relay rejects anyone else.
+            rivals: (notifications?.rivals ?? []).filter { configuration.competitors.contains($0) && $0 != configuration.selfLogin }
         )
         guard registration != lastRegistered || !installation.isRegistered else { return true }
         do {
@@ -275,8 +335,9 @@ final class RelayLiveRankRegistrar: LiveRankRegistrar, LiveRankTokenReceiving {
             LiveRankLog.relay.error("register failed: \(String(describing: error), privacy: .public)")
             return false
         }
-        LiveRankLog.relay.info("registered \(registration.competitors.count) people, \(registration.window, privacy: .public), push-to-start \(registration.pushToStartToken == nil ? "none" : "yes", privacy: .public)")
+        LiveRankLog.relay.info("registered \(registration.competitors.count) people, \(registration.window, privacy: .public), live rank \(registration.liveRank ? "on" : "off", privacy: .public), push-to-start \(registration.pushToStartToken == nil ? "none" : "yes", privacy: .public), notifications \(registration.notifications == nil ? "off" : registration.alertToken == nil ? "waiting for a token" : "on", privacy: .public)")
         lastRegistered = registration
+        deliversNotifications = registration.notifications != nil && registration.alertToken != nil
         if !installation.isRegistered {
             installation.isRegistered = true
             installations.save(installation)
@@ -296,6 +357,7 @@ final class RelayLiveRankRegistrar: LiveRankRegistrar, LiveRankTokenReceiving {
         installation.isRegistered = false
         installations.save(installation)
         lastRegistered = nil
+        deliversNotifications = false
         reportedActivities.removeAll()
     }
 }

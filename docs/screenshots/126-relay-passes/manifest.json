@@ -1,0 +1,60 @@
+{
+  "device": "iPhone Duo Simulator (shared persistent Duo 94D56458)",
+  "os": "iOS 27.1",
+  "screenshots": [
+    {
+      "file": "before-relay-sheet.png",
+      "caption": "Before (origin/main): the relay sheet, 'Keep Live rank on all day.', with no notifications line",
+      "capture": {
+        "sourceCommit": "43044bd0bbb4bbe53420085325092a6c5e6474c1",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), closed iPhone Duo, Large text. Launched with -ScreenshotFixture only."
+    },
+    {
+      "file": "after-relay-sheet.png",
+      "caption": "After: the relay sheet opens unchanged at the top",
+      "capture": {
+        "sourceCommit": "155dc093528e25fea570b36739ece8374506834d",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), closed iPhone Duo, Large text. Launched with -ScreenshotFixture only."
+    },
+    {
+      "file": "after-relay-sheet-end.png",
+      "caption": "After: the relay sheet's end, with the new 'Notifications:' line and the updated footnote (consent version 2)",
+      "capture": {
+        "sourceCommit": "155dc093528e25fea570b36739ece8374506834d",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), closed iPhone Duo, Large text. -ScreenshotSheetEnd opens it scrolled to the end (the closed Duo can't show it at once, and the agent couldn't scroll: no tap access)."
+    },
+    {
+      "file": "reconsent-sheet.png",
+      "caption": "New: 'Get notifications with Committed closed?' for someone who accepted the earlier relay sheet, with Leaderboard Notifications on",
+      "capture": {
+        "sourceCommit": "155dc093528e25fea570b36739ece8374506834d",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), closed iPhone Duo, Large text. -RelayDisclosureAccepted (the 1.0.x saved state) -notifyOnPositionChange YES."
+    },
+    {
+      "file": "reconsent-sheet-end.png",
+      "caption": "New: the re-consent sheet's end, with what the relay receives for notifications, Turn On and Not Now",
+      "capture": {
+        "sourceCommit": "155dc093528e25fea570b36739ece8374506834d",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), closed iPhone Duo, Large text. -RelayDisclosureAccepted -notifyOnPositionChange YES -ScreenshotSheetEnd."
+    },
+    {
+      "file": "settings-relay-notifications.png",
+      "caption": "Settings: Leaderboard Notifications' footer once relay notifications are agreed to",
+      "capture": {
+        "sourceCommit": "a1404ab83dcedbef6016f67b0aa45f037f430796",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), closed iPhone Duo, Large text. -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotTab settings."
+    }
+  ]
+}

@@ -6,7 +6,7 @@ export const WINDOWS_DOWNLOAD_AVAILABLE = process.env.NEXT_PUBLIC_WINDOWS_DOWNLO
 /** Contact goes through GitHub: Issues for questions and bugs, private advisories for security. */
 export const ISSUES_URL = "https://github.com/prompthunt/committed/issues";
 export const SECURITY_REPORT_URL = "https://github.com/prompthunt/committed/security/advisories/new";
-export const PRIVACY_EFFECTIVE_DATE = "November 8, 2026";
+export const PRIVACY_EFFECTIVE_DATE = "November 15, 2026";
 
 export const TITLE = "Committed — A GitHub leaderboard for Mac and Windows";
 export const DESCRIPTION =

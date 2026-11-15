@@ -1,4 +1,5 @@
 import type { ApnsEnvironment } from "./apns";
+import type { NotificationPreferences } from "./notifications/preferences";
 import type { Window } from "./ranking";
 
 export interface InstallationRow {
@@ -24,6 +25,16 @@ export interface InstallationRow {
   display_name: string | null;
   /** Unix seconds of the last name lookup, successful or not. */
   display_name_checked_at: number | null;
+  /** 1 = Live rank on; 0 = the cycle never starts, updates or rotates a Live Activity. */
+  live_rank: number;
+  /** The ordinary APNs device token for alert pushes (hex), or null. */
+  alert_token: string | null;
+  /** `NotificationPreferences` as JSON; null = relay notifications off. */
+  notifications_json: string | null;
+  /** Pinned rivals (JSON array of logins), at most 3. */
+  rivals_json: string;
+  /** `NotificationState` as JSON (see notifications/state.ts); null = nothing evaluated yet. */
+  notification_state: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -35,6 +46,14 @@ export interface Registration {
   window: Window;
   timeZone: string;
   apnsEnvironment: ApnsEnvironment;
+  /** Live rank on. 1.0.x apps don't send it: true. */
+  liveRank: boolean;
+  /** Null while notifications are off or iOS hasn't issued one. */
+  alertToken: string | null;
+  /** Null = relay notifications off (and what 1.0.x apps mean by leaving it out). */
+  notifications: NotificationPreferences | null;
+  /** Pinned rivals, each already on the board. */
+  rivals: string[];
 }
 
 export interface CachedDays {
@@ -73,19 +92,28 @@ export class Store {
     await this.db
       .prepare(
         `INSERT INTO installations (id, secret_hash, apns_environment, push_to_start_token, login,
-           competitors_json, window, time_zone, rate_window_start, rate_count, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+           competitors_json, window, time_zone, rate_window_start, rate_count, created_at, updated_at,
+           live_rank, alert_token, notifications_json, rivals_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(id, secretHash, reg.apnsEnvironment, reg.pushToStartToken, reg.login, JSON.stringify(reg.competitors),
-        reg.window, reg.timeZone, now, now, now)
+        reg.window, reg.timeZone, now, now, now, reg.liveRank ? 1 : 0, reg.alertToken,
+        reg.notifications ? JSON.stringify(reg.notifications) : null, JSON.stringify(reg.rivals))
       .run();
   }
 
+  /** With Live rank off, the activity is forgotten too: turning it back on starts afresh. */
   async update(id: string, reg: Registration, resetBaseline: boolean, now: number): Promise<void> {
+    const keepActivity = reg.liveRank ? 1 : 0;
     await this.db
       .prepare(
         `UPDATE installations SET apns_environment = ?, push_to_start_token = ?, login = ?, competitors_json = ?,
            window = ?, time_zone = ?, updated_at = ?,
+           live_rank = ?, alert_token = ?, notifications_json = ?, rivals_json = ?,
+           activity_id = CASE WHEN ? THEN activity_id ELSE NULL END,
+           activity_push_token = CASE WHEN ? THEN activity_push_token ELSE NULL END,
+           activity_started_at = CASE WHEN ? THEN activity_started_at ELSE NULL END,
+           last_state_json = CASE WHEN ? THEN last_state_json ELSE NULL END,
            display_name = CASE WHEN login = ? THEN display_name ELSE NULL END,
            display_name_checked_at = CASE WHEN login = ? THEN display_name_checked_at ELSE NULL END,
            baseline_date = CASE WHEN ? THEN NULL ELSE baseline_date END,
@@ -93,7 +121,10 @@ export class Store {
          WHERE id = ?`,
       )
       .bind(reg.apnsEnvironment, reg.pushToStartToken, reg.login, JSON.stringify(reg.competitors), reg.window,
-        reg.timeZone, now, reg.login, reg.login, resetBaseline ? 1 : 0, resetBaseline ? 1 : 0, id)
+        reg.timeZone, now, reg.liveRank ? 1 : 0, reg.alertToken,
+        reg.notifications ? JSON.stringify(reg.notifications) : null, JSON.stringify(reg.rivals),
+        keepActivity, keepActivity, keepActivity, keepActivity,
+        reg.login, reg.login, resetBaseline ? 1 : 0, resetBaseline ? 1 : 0, id)
       .run();
   }
 
@@ -146,6 +177,21 @@ export class Store {
       )
       .bind(row.push_to_start_token, row.activity_id, row.activity_push_token, row.activity_started_at,
         row.last_start_at, row.baseline_date, row.baseline_ranks_json, row.last_state_json, row.last_push_at, row.id)
+      .run();
+  }
+
+  // MARK: - Notifications
+
+  /** Only the notification state: the cycle never rewrites a registration it read earlier. */
+  async saveNotificationState(id: string, json: string): Promise<void> {
+    await this.db.prepare("UPDATE installations SET notification_state = ? WHERE id = ?").bind(json, id).run();
+  }
+
+  /** Forgets a dead alert token, unless the iPhone has sent a new one meanwhile. */
+  async clearAlertToken(id: string, token: string): Promise<void> {
+    await this.db
+      .prepare("UPDATE installations SET alert_token = NULL WHERE id = ? AND alert_token = ?")
+      .bind(id, token)
       .run();
   }
 
