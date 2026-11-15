@@ -39,7 +39,14 @@ struct RootView: View {
         .sheet(isPresented: $model.isShowingLiveRankDisclosure) {
             LiveRankDisclosureView()
         }
+        // Relay notifications, for someone who accepted the earlier relay sheet or never saw it.
+        // Never at the same time as the relay sheet, which covers notifications itself.
+        .sheet(isPresented: $model.isShowingRelayNotificationsConsent) {
+            RelayNotificationsConsentView()
+        }
         .onOpenURL { model.open($0) }
+        // A tapped notification opens where it points (a pass: that person's view).
+        .task { ForegroundNotificationPresenter.open = { [model] link in model.open(link) } }
         // Last, so the Connect cover and the disclosure sheet get them too.
         // The graph on screen changes when the Sample board starts or ends, so its objects are
         // injected here from the model, tracking the switch (the app's scene injects only the model).

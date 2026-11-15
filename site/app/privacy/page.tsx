@@ -3,7 +3,7 @@ import { Bullets, ReadingPage, Section } from "@/components/SiteChrome";
 import { ISSUES_URL, PRIVACY_EFFECTIVE_DATE, SECURITY_REPORT_URL } from "@/lib/site";
 
 const title = "Privacy policy — Committed";
-const description = "What Committed for iPhone, Mac and Windows sends, where it goes, and what the Committed relay receives for Live rank.";
+const description = "What Committed for iPhone, Mac and Windows sends, where it goes, and what the Committed relay receives for Live rank and notifications.";
 
 export const metadata: Metadata = {
   title,
@@ -24,7 +24,7 @@ export default function Privacy() {
       title="Privacy policy"
       intro={
         <>
-          <p>Committed is made by Prompt Hunt, Inc. There’s no Committed account. The apps talk to GitHub directly, and the only other service they use is the Committed relay, for Live rank on iPhone.</p>
+          <p>Committed is made by Prompt Hunt, Inc. There’s no Committed account. The apps talk to GitHub directly, and the only other service they use is the Committed relay, for Live rank and notifications on iPhone.</p>
           <p className="text-base text-muted">Effective {PRIVACY_EFFECTIVE_DATE}</p>
         </>
       }
@@ -36,25 +36,26 @@ export default function Privacy() {
           <li>The token is stored in the iPhone’s or Mac’s Keychain, or in Windows Credential Manager. <strong>Disconnect GitHub</strong> deletes it.</li>
           <li>GitHub API calls go straight from your device to GitHub. Contributions come from each person’s public GitHub contribution page, which the apps read anonymously.</li>
           <li>Your people list, Contributions, and the people you hide are saved on your device. They aren’t synced between your devices.</li>
-          <li>Leaderboard Notifications are created on your device.</li>
+          <li>On Mac and Windows, Leaderboard Notifications are created on your device. On iPhone they are too, unless you turn on notifications from the Committed relay (below).</li>
           <li>The apps contain no analytics or crash reporting.</li>
         </Bullets>
       </Section>
 
       <Section id="relay" title="The Committed relay">
-        <p>The Committed relay keeps Live rank current in the Dynamic Island and on the Lock Screen while the iPhone app is closed. It’s used only while Live rank is on. Before Live rank first turns on, the app shows what the relay receives and asks you to turn it on.</p>
+        <p>The Committed relay keeps Live rank current in the Dynamic Island and on the Lock Screen while the iPhone app is closed, and tells you when someone passes you, or you pass them, with the app closed. It’s used only while Live rank or relay notifications is on, and each can be on without the other. Before either first turns on, the app shows what the relay receives and asks you to turn it on.</p>
         <h3>What it receives</h3>
         <Bullets>
           <li>Your GitHub username and the usernames on your board, in board order. These are public.</li>
-          <li>Live rank’s Window and your time zone.</li>
+          <li>Live rank’s Window, whether Live rank is on, and your time zone.</li>
           <li>The Apple push tokens that update Live rank on your iPhone, and whether your build uses Apple’s test or production push service.</li>
+          <li>With relay notifications on: your notification choices, the rivals you pinned, and the Apple push token that delivers notifications to your iPhone.</li>
           <li>A random installation ID and secret your iPhone creates. The relay stores only a hash of the secret.</li>
         </Bullets>
         <p>It never receives your GitHub token. That’s sent only to GitHub.</p>
         <h3>What it does</h3>
-        <p>Every 5 minutes, the relay reads the public contribution pages of the usernames it has, anonymously, and keeps the daily counts in a cache shared by everyone. It ranks your board and sends Live rank updates through Apple’s push service. It doesn’t send notifications. The relay runs on Cloudflare.</p>
+        <p>Every 5 minutes, the relay reads the public contribution pages of the usernames it has, anonymously, and keeps the daily counts in a cache shared by everyone. It ranks your board and sends Live rank updates through Apple’s push service. With relay notifications on, it compares your board with its previous check and sends a notification through Apple’s push service when someone passes you, or you pass them. To do that it keeps the counts it last checked, and nothing else about you. The relay runs on Cloudflare.</p>
         <h3>Stopping it</h3>
-        <p>Turning Live rank off in Settings, or <strong>Disconnect GitHub</strong>, deletes your iPhone’s registration from the relay. The relay keeps a registration until then, so do one of these before you delete the app.</p>
+        <p>Turning off both Live rank and Leaderboard Notifications in Settings, or <strong>Disconnect GitHub</strong>, deletes your iPhone’s registration from the relay, with everything it holds for it. The relay keeps a registration until then, so do one of these before you delete the app.</p>
         <h3>Committed for NZXT Kraken</h3>
         <p>The <a href="/kraken">Kraken page</a> asks the relay for your rank once a minute. Each request carries a GitHub username, the usernames you’re racing, the Window and your time zone. The relay doesn’t store them; it keeps only the shared cache of public daily counts. The page keeps your settings in your browser, and loads the people you follow from GitHub’s public API.</p>
       </Section>

@@ -95,6 +95,121 @@ struct RelayLiveRankRegistrarTests {
         #expect(api.installations.last == saved.credentials)
     }
 
+    // MARK: Relay notifications (#126)
+
+    private var notificationsOn: RelayNotificationsConfiguration {
+        RelayNotificationsConfiguration(preferences: NotificationPreferences())
+    }
+
+    @Test func liveRankAloneSendsNoNotifications() async throws {
+        let registrar = makeRegistrar()
+        await registrar.liveRankDidChange(board)
+
+        let body = try #require(api.registrations.last)
+        #expect(body.liveRank)
+        #expect(body.notifications == nil)
+        #expect(body.alertToken == nil)
+        #expect(body.rivals == [])
+        #expect(!registrar.deliversNotifications)
+    }
+
+    @Test func notificationsAloneRegisterWithLiveRankOff() async {
+        let registrar = makeRegistrar()
+        await registrar.pushToStartTokenDidChange(Data([0x01]))
+        await registrar.relayNotificationsDidChange(notificationsOn)
+        await registrar.alertTokenDidChange(Data([0xAB, 0xCD]))
+        await registrar.liveRankDidChange(LiveRankConfiguration(
+            selfLogin: "me", competitors: ["me", "ada", "bo"], window: .daily, liveRank: false
+        ))
+
+        #expect(api.registrations.last == RelayRegistration(
+            pushToStartToken: nil, login: "me", competitors: ["me", "ada", "bo"], window: "daily",
+            timeZone: "America/New_York", apnsEnvironment: "sandbox",
+            liveRank: false, alertToken: "abcd", notifications: NotificationPreferences(), rivals: []
+        ))
+        #expect(registrar.deliversNotifications)
+    }
+
+    @Test func deliversOnlyOnceTheRelayHasTheAlertToken() async {
+        let registrar = makeRegistrar()
+        await registrar.liveRankDidChange(board)
+        await registrar.relayNotificationsDidChange(notificationsOn)
+        #expect(api.registrations.last?.notifications == NotificationPreferences())
+        #expect(!registrar.deliversNotifications)
+
+        api.failure = LiveRankRelayError.status(503)
+        await registrar.alertTokenDidChange(Data([0x0F]))
+        #expect(!registrar.deliversNotifications) // the relay never heard
+
+        api.failure = nil
+        await registrar.retryPendingWork()
+        #expect(api.registrations.last?.alertToken == "0f")
+        #expect(registrar.deliversNotifications)
+    }
+
+    @Test func turningNotificationsOffKeepsLiveRank() async {
+        let registrar = makeRegistrar()
+        await registrar.liveRankDidChange(board)
+        await registrar.relayNotificationsDidChange(notificationsOn)
+        await registrar.alertTokenDidChange(Data([0x0F]))
+
+        await registrar.relayNotificationsDidChange(nil)
+
+        #expect(api.calls.last == .register(RelayRegistration(
+            pushToStartToken: nil, login: "me", competitors: ["me", "ada", "bo"], window: "daily",
+            timeZone: "America/New_York", apnsEnvironment: "sandbox"
+        )))
+        #expect(!registrar.deliversNotifications)
+    }
+
+    @Test func bothOffDeletesTheRegistration() async {
+        let registrar = makeRegistrar()
+        await registrar.liveRankDidChange(board)
+        await registrar.relayNotificationsDidChange(nil)
+
+        await registrar.liveRankDidChange(LiveRankConfiguration(
+            selfLogin: "me", competitors: ["me", "ada", "bo"], window: .daily, liveRank: false
+        ))
+
+        #expect(api.calls.last == .unregister)
+    }
+
+    @Test func liveRankOffWaitsUntilTheNotificationChoiceIsKnown() async {
+        let registrar = makeRegistrar()
+        await registrar.liveRankDidChange(board)
+        // A cold launch where the board arrives before the app has said anything about notifications.
+        await registrar.liveRankDidChange(LiveRankConfiguration(
+            selfLogin: "me", competitors: ["me", "ada", "bo"], window: .daily, liveRank: false
+        ))
+        #expect(api.calls.count == 1)
+
+        await registrar.relayNotificationsDidChange(notificationsOn)
+        #expect(api.registrations.last?.liveRank == false)
+        #expect(api.registrations.last?.notifications != nil)
+    }
+
+    @Test func disconnectStopsDelivery() async {
+        let registrar = makeRegistrar()
+        await registrar.relayNotificationsDidChange(notificationsOn)
+        await registrar.alertTokenDidChange(Data([0x0F]))
+        await registrar.liveRankDidChange(board)
+        #expect(registrar.deliversNotifications)
+
+        await registrar.liveRankDidChange(nil)
+
+        #expect(api.calls.last == .unregister)
+        #expect(!registrar.deliversNotifications)
+    }
+
+    @Test func pinnedRivalsOffTheBoardAreLeftOut() async {
+        let registrar = makeRegistrar()
+        await registrar.relayNotificationsDidChange(RelayNotificationsConfiguration(
+            preferences: NotificationPreferences(), rivals: ["ada", "zed", "me"]
+        ))
+        await registrar.liveRankDidChange(board)
+        #expect(api.registrations.last?.rivals == ["ada"])
+    }
+
     // MARK: Re-registration triggers
 
     @Test func visibilityWindowAndRosterChangesReRegister() async {
@@ -308,7 +423,8 @@ struct LiveRankRelayRequestTests {
     @Test func registrationIsAPutWithExactlyTheRelaysKeys() throws {
         let request = try URLSessionLiveRankRelayAPI.request(
             .register(RelayRegistration(pushToStartToken: nil, login: "me", competitors: ["me", "ada"], window: "weekly",
-                                        timeZone: "Europe/Paris", apnsEnvironment: "sandbox")),
+                                        timeZone: "Europe/Paris", apnsEnvironment: "sandbox", liveRank: false,
+                                        alertToken: "ab12", notifications: NotificationPreferences(), rivals: ["ada"])),
             baseURL: base, installation: credentials
         )
 
@@ -318,10 +434,32 @@ struct LiveRankRelayRequestTests {
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
         let data = try #require(request.httpBody)
         let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        #expect(Set(body.keys) == ["pushToStartToken", "login", "competitors", "window", "timeZone", "apnsEnvironment"])
+        #expect(Set(body.keys) == [
+            "pushToStartToken", "login", "competitors", "window", "timeZone", "apnsEnvironment",
+            "liveRank", "alertToken", "notifications", "rivals",
+        ])
         #expect(body["pushToStartToken"] is NSNull)
         #expect(body["competitors"] as? [String] == ["me", "ada"])
         #expect(body["window"] as? String == "weekly")
+        #expect(body["liveRank"] as? Bool == false)
+        #expect(body["alertToken"] as? String == "ab12")
+        #expect(body["rivals"] as? [String] == ["ada"])
+        let notifications = try #require(body["notifications"] as? [String: Any])
+        #expect(notifications["passes"] as? String == "everyone")
+        #expect(notifications["window"] as? String == "daily")
+    }
+
+    /// Notifications off are an explicit null, as the relay expects.
+    @Test func notificationsOffIsNull() throws {
+        let request = try URLSessionLiveRankRelayAPI.request(
+            .register(RelayRegistration(pushToStartToken: "01", login: "me", competitors: ["me"], window: "daily",
+                                        timeZone: "UTC", apnsEnvironment: "production")),
+            baseURL: base, installation: credentials
+        )
+        let body = try #require(JSONSerialization.jsonObject(with: try #require(request.httpBody)) as? [String: Any])
+        #expect(body["notifications"] is NSNull)
+        #expect(body["alertToken"] is NSNull)
+        #expect(body["liveRank"] as? Bool == true)
     }
 
     @Test func activityReportIsAPutToTheActivityPath() throws {

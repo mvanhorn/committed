@@ -1,9 +1,13 @@
 # Committed relay
 
 The Committed relay keeps **Live rank** current while the iPhone app is closed (spec #39,
-phase 2; ticket #44). Every 5 minutes it reads public contribution graphs, recomputes each
-registered installation's `LiveRankState`, and sends ActivityKit pushes through APNs. Before
-iOS's 8-hour limit, it ends the activity and starts a fresh one with push-to-start.
+phase 2; ticket #44), and sends **relay notifications** (spec #124: passes first, in #126). Every
+5 minutes it reads public contribution graphs, recomputes each registered installation's
+`LiveRankState`, and sends ActivityKit pushes through APNs. Before iOS's 8-hour limit, it ends
+the activity and starts a fresh one with push-to-start. Then it sends the alert notifications
+each installation asked for.
+
+An installation exists while Live rank **or** relay notifications is on.
 
 It receives only public GitHub usernames. It never accepts, stores, or logs a GitHub token,
 and its logs omit push tokens and install secrets.
@@ -81,12 +85,39 @@ Registers or updates. `{id}` is 8 to 64 characters of `[A-Za-z0-9-]`; a UUID wor
   "competitors": ["addisonk", "alice", "bob"],  // visible board, in board order (ties)
   "window": "daily",                 // "daily" | "weekly" | "monthly"
   "timeZone": "America/New_York",    // IANA
-  "apnsEnvironment": "sandbox"       // "sandbox" | "production"
+  "apnsEnvironment": "sandbox",      // "sandbox" | "production"
+  // Spec #124. All optional: the 1.0.x apps send none of them.
+  "liveRank": true,                  // default true; false = never start, update or rotate an activity
+  "alertToken": "hex…",              // the ordinary APNs device token, or null (default)
+  "notifications": {                 // null (default) = relay notifications off
+    "window": "daily",               // passes and close calls are judged on it; "daily" | "weekly" | "monthly"
+    "passes": "everyone",            // "everyone" | "rivals" | "off"
+    "closeCalls": false,
+    "results": true,
+    "records": true,
+    "streakReminder": false,
+    "delivery": "summary",           // "immediate" | "summary" (passes now, the rest at 9 PM)
+    "quietHours": { "start": "22:00", "end": "08:00" }   // local "HH:MM", or null for off
+  },
+  "rivals": ["alice"]                // pinned rivals, at most 3, each in competitors; default []
 }
 ```
 
 - Logins are lowercased, deduplicated, and kept in the order sent. If `login` is missing from
   `competitors`, it's put first, where the app places itself.
+- A missing key inside `notifications` takes the default shown. Unknown keys there are rejected
+  too (`unknown_field:notifications.<key>`). Error codes: `invalid_live_rank`,
+  `invalid_alert_token`, `invalid_notifications`, `invalid_notifications_window`,
+  `invalid_notifications_passes`, `invalid_notifications_close_calls`,
+  `invalid_notifications_results`, `invalid_notifications_records`,
+  `invalid_notifications_streak_reminder`, `invalid_notifications_delivery`,
+  `invalid_quiet_hours`, `invalid_rivals`, `too_many_rivals`, `unknown_rival`.
+- `liveRank: false` and `notifications: null` together delete the installation (ending any
+  activity, as `DELETE` does) and return `204`; they never create one.
+- Turning `liveRank` off ends the current activity and forgets Live rank's tokens. The relay
+  keeps the alert token only while `notifications` is set.
+- Quiet hours, `delivery`, `rivals` filtering and the kinds after passes are stored now and take
+  effect in later tickets (#130–#135).
 - At most 1,000 competitors, self included.
 - Returns `201` on creation, `200` on update.
 - A changed competitor list resets today's movement baseline, as a visibility change does in
@@ -394,10 +425,45 @@ WIDGET_SCREENS=/some/dir npm run test:browser   # also save a screenshot of each
    - Today resets in place at local midnight; that's just a state change.
 7. **Dead tokens.** `410`, or `400` with `BadDeviceToken` or `DeviceTokenNotForTopic`, clears
    the token that was used.
+8. **Live rank off.** With `liveRank = false`, steps 5 and 6 are skipped: no push-to-start,
+   update or rotation. The movement baseline is still recorded for the board route.
+9. **Relay notifications** (`src/notifications/`, one file per kind), after every installation's
+   Live rank pushes, for installations with `notifications` and an `alertToken`:
+   - **Passes** (`passes.ts`) port `RankChangeDetector.crossings`: "was at or below you, now
+     strictly above you", or the reverse. Holding a tie fires nothing. They're judged on the
+     preferences' Window among the visible board, against the counts of the previous run. The
+     first look, a new local day and a new Window take a fresh baseline silently. While your
+     own count is missing, the last baseline is kept.
+   - Each pass is one alert push: `apns-push-type: alert`, `apns-topic: <APNS_BUNDLE_ID>`,
+     priority 10, `apns-collapse-id: pass.<login>`, with the shipped copy from
+     `NotificationService.copy(for:)`:
+
+     ```json
+     {
+       "aps": {
+         "alert": { "title": "😤 alice passed you", "body": "They're ahead 7–5. Time to catch up!" },
+         "sound": "default", "category": "PASS", "thread-id": "passes"
+       },
+       "kind": "pass",
+       "login": "alice"
+     }
+     ```
+
+   - State lives in one JSON column, `notification_state`, keyed by kind
+     (`{"passes": {"window", "date", "counts"}}`). It's saved before anything is sent, so a
+     failure can't send the same pass twice. Later kinds add their own keys.
+   - A dead alert token is cleared (only if it's still the stored one) and logged as
+     `token_cleared` with `token: "alert"`.
 
 APNs auth is an ES256 JWT signed with WebCrypto from the `.p8` key and cached for 50 minutes.
 
-## Conformance fixture
+## Conformance fixtures
+
+`../fixtures/habit-conformance.json` (spec #124) is shared with the Mac test target. Its
+`passes` cases run against `RankChangeDetector` and `NotificationService.copy(for:)` in
+`CommitStandingsTests/HabitPassConformanceTests.swift`, and against `src/notifications/passes.ts`
+in `test/habitPasses.test.ts`, so a pass the app would post is the pass the relay sends, in the
+same words.
 
 `../fixtures/ranking-conformance.json` is shared with the Mac test target and the Windows core
 (`windows/core/tests/conformance.rs`, which checks `order` and streaks: Windows has no Live rank),
@@ -481,7 +547,12 @@ so the Swift ordering, this port and the Windows board can't drift.
    ```
    `APNS_BUNDLE_ID` is a var in `wrangler.jsonc` (`com.addisonk.CommitStandings.iOS`).
 4. Deploy with `npx wrangler deploy`. The cron trigger deploys with it.
-5. Plan limits: each run makes one subrequest per uncached login, plus one per push. The
+5. **Order for a schema change** (for example `0004_notifications.sql`, spec #124): apply the
+   migration (`npx wrangler d1 migrations apply committed-relay --remote`), then deploy the
+   Worker, then ship the app. Migrations are additive with defaults, so the Worker already
+   running keeps working after step one. An app that sends new fields to an older Worker gets
+   `400 unknown_field:…`, so the app goes last.
+6. Plan limits: each run makes one subrequest per uncached login, plus one per push. The
    Workers Free plan's per-invocation subrequest cap (50 at the time of writing) only covers a
    small board, so use Workers Paid for real use. Check current limits before deploying.
 

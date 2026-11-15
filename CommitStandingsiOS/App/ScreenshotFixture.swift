@@ -76,12 +76,19 @@ enum ScreenshotFixture {
     }
 
     /// Live rank settings for the fixture, in memory: never chosen, or accepted and on with
-    /// `-RelayDisclosureAccepted`.
+    /// `-RelayDisclosureAccepted` (the earlier sheet, as 1.0.x saved it). Add
+    /// `-RelayNotificationsAccepted` to have agreed to relay notifications too. With Leaderboard
+    /// Notifications on (`-notifyOnPositionChange YES`), the earlier sheet alone shows "Get
+    /// notifications with Committed closed?".
     static func liveRankPreferences() -> InMemoryLiveRankPreferences {
-        guard ProcessInfo.processInfo.arguments.contains("-RelayDisclosureAccepted") else {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("-RelayDisclosureAccepted") else {
             return InMemoryLiveRankPreferences()
         }
-        return InMemoryLiveRankPreferences(LiveRankPreferences(isEnabled: true, relayDisclosureAccepted: true))
+        let notifications: Bool? = arguments.contains("-RelayNotificationsAccepted") ? true : nil
+        return InMemoryLiveRankPreferences(LiveRankPreferences(
+            isEnabled: true, relayDisclosureAccepted: true, relayNotifications: notifications
+        ))
     }
 
     private static func value(after flag: String) -> String? {
