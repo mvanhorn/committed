@@ -52,7 +52,9 @@ struct RelayNotificationsTests {
         let model = AppModel(
             services: services, backgroundTime: FakeBackgroundTime(),
             liveRankActivities: activities, liveRankPreferences: preferences, liveRankRelay: relay,
-            notificationPreferences: choices, remoteNotifications: remote, now: { clock.now }
+            notificationPreferences: choices, remoteNotifications: remote,
+            notificationAuthorization: { permission ? .authorized : .denied },
+            now: { clock.now }
         )
         return (model, contributions)
     }
@@ -346,6 +348,7 @@ struct RelayNotificationsTests {
         await model.setNotificationChoice(\.results, true)
 
         #expect(!model.services.notifications.isEnabled)
+        #expect(model.notificationsDeniedInSettings) // the screen says so
         #expect(!model.notificationChoices.results)
         #expect(!model.relayNotificationsOn)
         #expect(relay.notifications.compactMap { $0 }.isEmpty)
