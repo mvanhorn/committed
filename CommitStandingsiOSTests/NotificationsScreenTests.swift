@@ -117,6 +117,23 @@ struct NotificationsScreenTests {
         #expect(lastNotifications?.preferences == expected)
     }
 
+    /// Results (#131): Daily and weekly results, on by default, saved and sent as `results`.
+    @Test func resultsAreOnByDefaultAndTurningThemOffReachesTheRelay() async {
+        agreedToRelayNotifications()
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+        #expect(model.notificationChoices.results)
+
+        await model.updateNotificationChoices { $0.results = false }
+
+        #expect(!model.notificationChoices.results)
+        #expect(choices.load(account: "me").results == false)
+        #expect(lastNotifications?.preferences.results == false)
+
+        await model.updateNotificationChoices { $0.results = true }
+        #expect(lastNotifications?.preferences.results == true)
+    }
+
     @Test func quietHoursOffReachTheRelayAsNull() async {
         agreedToRelayNotifications()
         let model = makeModel()
