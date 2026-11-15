@@ -2,6 +2,8 @@ import posthog from "posthog-js";
 
 let enabled = false;
 
+export type AnalyticsPlacement = "hero" | "header" | "footer" | "closing" | "challenge";
+
 export function initAnalytics() {
   const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
   // Keep localhost, contributor builds, and Vercel previews out of launch numbers.
@@ -27,7 +29,7 @@ export function initAnalytics() {
   enabled = true;
 }
 
-export function captureLink(event: "download_clicked" | "github_clicked", placement: "hero" | "header" | "footer" | "closing") {
+export function captureLink(event: "download_clicked" | "github_clicked", placement: AnalyticsPlacement) {
   if (!enabled) return;
   // Analytics must never delay or prevent the normal link / download behavior.
   try {
