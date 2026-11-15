@@ -266,8 +266,9 @@ private struct BoardShareFooter: View {
 }
 
 /// The contribution graph's squares behind everything, as on the site: mostly empty, some green,
-/// the odd lime one. The same pattern every time, brightest at the edges.
-private struct BoardShareSquareField: View {
+/// the odd lime one. The same pattern every time, brightest at the edges. Challenge's story image
+/// draws it too.
+struct BoardShareSquareField: View {
     let brightness: Double
 
     var body: some View {

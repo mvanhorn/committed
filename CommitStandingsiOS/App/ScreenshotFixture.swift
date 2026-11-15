@@ -14,7 +14,8 @@ import UIKit
 /// board has loaded,
 /// `-ScreenshotPerson <login>` opens that person's view (pushed onto the Board, or the second pane on the open
 /// iPhone Duo) and `-ScreenshotPersonDay <n>` selects that day's bar instead of today's
-/// (`-ScreenshotPersonEnd` scrolls it to the end),
+/// (`-ScreenshotPersonEnd` scrolls it to the end), `-ScreenshotChallenge <login>` opens that person's
+/// view and their Challenge share once their race loads (as a notification's Share your race will),
 /// `-ScreenshotTroll <login>` gives that person a trolling day (784 more, the troll face),
 /// `-ScreenshotCountScale <n>` multiplies everyone's counts by n (30 puts every 30-day count in
 /// the thousands beside the streaks, the board's widest rows), and
@@ -48,6 +49,12 @@ enum ScreenshotFixture {
     /// `-ScreenshotPerson <login>`: the person view to open on launch, as a tap on their row would.
     static var requestedPerson: String? {
         value(after: "-ScreenshotPerson")
+    }
+
+    /// `-ScreenshotChallenge <login>`: opens that person's view and presents their Challenge share
+    /// once their race has loaded, through `AppModel.requestChallenge`.
+    static var requestedChallenge: String? {
+        value(after: "-ScreenshotChallenge")
     }
 
     /// `-ScreenshotPersonDay <n>`: the person view's selected bar, instead of today's.

@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// The person view on iPhone: the shared `PersonViewContent` in the app's materials, scrolling on
-/// ink, with the iPhone's private-contributions tip on your own view. `BoardView` pushes it onto
+/// ink, with the iPhone's private-contributions tip on your own view and Challenge under Your race
+/// on someone else's. `BoardView` pushes it onto
 /// the Board, or shows it in the second pane on iPhone Duo when the panes sit side by side.
 ///
 /// Wherever it's wider than tall and has room for two readable columns (the closed iPhone Duo or
@@ -11,6 +12,7 @@ import SwiftUI
 /// spans the fold: on the open iPhone Duo it's the Board's second pane, one column, and taller
 /// than wide it's one column that scrolls, which needs nothing from the fold.
 struct PersonScreen: View {
+    @Environment(AppModel.self) private var model
     let person: PersonSummary
     /// Off in the Board's second pane, which is already one half of the Board.
     var allowsColumns = true
@@ -47,6 +49,11 @@ struct PersonScreen: View {
         ScrollView {
             PersonViewContent(person: person, initialDay: Self.initialDay, part: part) {
                 PrivateWorkTip(dismissible: false)
+            } raceAccessory: {
+                // Hidden on the Sample board and until the race loads.
+                if let challenge = model.challenge(for: person) {
+                    ChallengeButton(challenge: challenge, person: person)
+                }
             }
             .padding(16)
             .frame(maxWidth: 640)
