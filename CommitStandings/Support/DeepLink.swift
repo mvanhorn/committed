@@ -58,8 +58,9 @@ enum DeepLink: Equatable, Sendable {
             return
         }
         let login = (userInfo["login"] as? String).flatMap(UsernameNormalization.normalize)
-        // Close calls and records have no actions: tapping one opens the view of the login it names.
-        if kind == "closeCall" || kind == "record" {
+        // Close calls, records and streak reminders have no actions: tapping one opens the view of
+        // the login it names (yours, for records and streak reminders).
+        if kind == "closeCall" || kind == "record" || kind == "streakReminder" {
             guard action == Self.bodyTapAction, let login else { return nil }
             self = .person(login: login)
             return

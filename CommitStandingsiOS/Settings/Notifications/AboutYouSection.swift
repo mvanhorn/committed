@@ -5,13 +5,20 @@ import SwiftUI
 /// the Board's record card. The relay sends them, even with Committed closed; one that lands
 /// during quiet hours waits until they end. Tapping one opens your own view.
 ///
-/// The streak reminder (#133) joins it, below Records.
+/// **Streak reminder** (#133, off by default), below Records: the relay reminds you at 8 PM, or an
+/// hour before quiet hours if that's earlier, when your streak is at least 2 days and you haven't
+/// contributed yet today (relay/src/notifications/streakReminder.ts). Its line under the switch
+/// says when; tapping it opens your own view.
 struct AboutYouSection: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
         Section {
             Toggle("Records", isOn: model.notificationChoice(\.records))
+            Toggle(isOn: model.notificationChoice(\.streakReminder)) {
+                Text("Streak reminder")
+                Text("At 8 PM, or an hour before quiet hours if that's earlier, when your streak is 2 days or more and you haven't contributed yet today.")
+            }
         } header: {
             FolioHeader("About you")
         } footer: {

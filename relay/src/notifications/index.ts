@@ -8,6 +8,7 @@ import { notifyRecords } from "./records";
 import { parsePreferences, type NotificationPreferences } from "./preferences";
 import { notifyResults } from "./results";
 import { parseState, type NotificationState } from "./state";
+import { notifyStreakReminder } from "./streakReminder";
 
 /**
  * Relay notifications (spec #124): what the cron cycle sends each installation that has
@@ -47,6 +48,7 @@ export async function runNotifications(
   state = await notifyPasses(context, state, (next) => saveState(row, next, deps), deps);
   state = await notifyCloseCalls(context, state, (next) => saveState(row, next, deps), deps);
   state = await notifyRecords(context, state, (next) => saveState(row, next, deps), deps);
+  state = await notifyStreakReminder(context, state, (next) => saveState(row, next, deps), deps);
   state = await notifyResults(context, state, (next) => saveState(row, next, deps), deps);
 }
 
