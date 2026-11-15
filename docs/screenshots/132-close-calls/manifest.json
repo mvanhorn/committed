@@ -23,7 +23,7 @@
     },
     {
       "file": "notifications-close-calls-on.png",
-      "caption": "Close calls on (saved per account through model.notificationChoice(\\.closeCalls), nobody pinned)",
+      "caption": "Close calls on, nobody pinned (choice set by the fixture's -ScreenshotCloseCalls, not by tapping the switch)",
       "capture": {
         "sourceCommit": "48927530b257356718d5e538fc29d4d758d82481",
         "fixture": true
