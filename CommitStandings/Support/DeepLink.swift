@@ -45,17 +45,25 @@ enum DeepLink: Equatable, Sendable {
     static let bodyTapAction = "com.apple.UNNotificationDefaultActionIdentifier"
 
     /// Where a tapped relay notification goes. A pass: the body opens the rival's view, Share your
-    /// race opens it with their Challenge share, Open Board opens the Board. A result (#131, a daily
-    /// result or last week's final): the body opens the Board. Nil for anything else (another kind,
-    /// a dismissal, an unknown action), and the app just opens.
+    /// race opens it with their Challenge share, Open Board opens the Board. A tapped close call (#132)
+    /// opens that person's view. A tapped result (#131, a daily result or last week's final) opens
+    /// the Board. Nil for anything else (another kind, a dismissal, an unknown action), and the app
+    /// just opens.
     init?(notification userInfo: [AnyHashable: Any], action: String = Self.bodyTapAction) {
+        // A relay result (#131) has no actions: tapping it opens the Board.
         if userInfo["kind"] as? String == "result" {
             guard action == Self.bodyTapAction else { return nil }
             self = .board(window: nil)
             return
         }
-        guard userInfo["kind"] as? String == "pass" else { return nil }
         let login = (userInfo["login"] as? String).flatMap(UsernameNormalization.normalize)
+        // A relay close call (#132) has no actions: tapping it opens that person's view.
+        if userInfo["kind"] as? String == "closeCall" {
+            guard action == Self.bodyTapAction, let login else { return nil }
+            self = .person(login: login)
+            return
+        }
+        guard userInfo["kind"] as? String == "pass" else { return nil }
         switch action {
         case Self.bodyTapAction:
             guard let login else { return nil }

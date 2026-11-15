@@ -8,6 +8,7 @@ import type { Window } from "../ranking";
  */
 export interface NotificationState {
   passes?: PassesState;
+  closeCalls?: CloseCallsState;
   /** Keys added by later kinds, kept as they are. */
   [kind: string]: unknown;
 }
@@ -19,6 +20,14 @@ export interface PassesState {
   date: string;
   /** Login → contributions in `window`, for the visible people with data, you included. */
   counts: Record<string, number>;
+}
+
+/** Who got a close call today: at most one per person per local day. */
+export interface CloseCallsState {
+  /** The installation's local date (`YYYY-MM-DD`) the markers are for. */
+  date: string;
+  /** Logins sent a close call on `date`. */
+  sent: string[];
 }
 
 export function parseState(raw: string | null): NotificationState {
