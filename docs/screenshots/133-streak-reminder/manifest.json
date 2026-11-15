@@ -1,7 +1,7 @@
 {
   "device": "iPhone Duo Simulator (shared persistent Duo 94D56458-B90B-484A-BA5E-16748D2CBEE5), closed, portrait",
   "os": "iOS 27.1",
-  "notes": "Runtime captures, not renders, at 3a179b6 (after merging #132 and #134: About your rivals has Close calls, and About you is #134's section with Records above Streak reminder). The switch was set through the fixture (-ScreenshotStreakReminder), not tapped (no tap access from the agent); the binding is covered by NotificationsScreenTests. The tap capture feeds a streak-reminder response through the notification delegate's own route (-ScreenshotNotificationResponse with -ScreenshotNotificationKind streakReminder); no notification was shown or tapped, since relay alert pushes can't reach the Simulator without a real APNs token. The reminder's payload and copy are pinned by relay/test/streakReminder.test.ts. The open iPhone Duo and accessibility text sizes were not captured. Known: #134's Records footer now sits under the Streak reminder row, so it can read as if it describes the reminder; left for the final review.",
+  "notes": "Runtime captures, not renders, at 0b76345 (after merging #132, #134 and the any-switch gate: About your rivals has Close calls, and About you is #134's section with Records above Streak reminder). The switch was set through the fixture (-ScreenshotStreakReminder), not tapped (no tap access from the agent); the binding is covered by NotificationsScreenTests. The tap capture feeds a streak-reminder response through the notification delegate's own route (-ScreenshotNotificationResponse with -ScreenshotNotificationKind streakReminder); no notification was shown or tapped, since relay alert pushes can't reach the Simulator without a real APNs token. The reminder's payload and copy are pinned by relay/test/streakReminder.test.ts. The open iPhone Duo and accessibility text sizes were not captured. Known: #134's Records footer now sits under the Streak reminder row, so it can read as if it describes the reminder; left for the final review.",
   "screenshots": [
     {
       "file": "before-notifications.png",
@@ -16,7 +16,7 @@
       "file": "notifications-about-you-off.png",
       "caption": "After: About you (#134's section) with Records on and the new Streak reminder below it, off by default, with a line under it saying when it comes",
       "capture": {
-        "sourceCommit": "3a179b66abf40c63a161ccd902d08e2dba0b843b",
+        "sourceCommit": "0b7634572e96ff07d53b1a41f6bac26021d6fc68",
         "fixture": true
       },
       "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, light appearance, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -ScreenshotTab settings -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotNotifications."
@@ -25,7 +25,7 @@
       "file": "notifications-about-you-on.png",
       "caption": "After: Streak reminder on, saved for this account and sent to the relay as streakReminder: true",
       "capture": {
-        "sourceCommit": "3a179b66abf40c63a161ccd902d08e2dba0b843b",
+        "sourceCommit": "0b7634572e96ff07d53b1a41f6bac26021d6fc68",
         "fixture": true
       },
       "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, light appearance, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -ScreenshotTab settings -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotNotifications -ScreenshotStreakReminder."
@@ -34,7 +34,7 @@
       "file": "streak-reminder-tap-own-view.png",
       "caption": "A tapped streak reminder (Committed closed) opens your own view: ari-linden, you, on the Board tab",
       "capture": {
-        "sourceCommit": "3a179b66abf40c63a161ccd902d08e2dba0b843b",
+        "sourceCommit": "0b7634572e96ff07d53b1a41f6bac26021d6fc68",
         "fixture": true
       },
       "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, light appearance, captured with xcrun simctl io --display=1 inside the apple-session lease.. Launched with -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotNotificationResponse com.apple.UNNotificationDefaultActionIdentifier:ari-linden -ScreenshotNotificationKind streakReminder."
