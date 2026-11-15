@@ -29,8 +29,8 @@ import UIKit
 /// the thousands beside the streaks, the board's widest rows), and
 /// `-LiveRankPayload <file.json>` shows a Live Activity push payload's content state in Live rank,
 /// `-ScreenshotNotifications` opens Settings ▸ Notifications (with `-ScreenshotTab settings`),
-/// `-ScreenshotPasses rivals` and `-ScreenshotQuietHours 23:30-07:00` (or `off`) set the board
-/// owner's notification choices, `-ScreenshotNotificationsDenied` reads iOS's permission as denied,
+/// `-ScreenshotPasses rivals`, `-ScreenshotQuietHours 23:30-07:00` (or `off`) and
+/// `-ScreenshotResults off` set the board owner's notification choices, `-ScreenshotNotificationsDenied` reads iOS's permission as denied,
 /// `-ScreenshotNoRelay` runs a relay build as one without the relay,
 /// and `-RelayDisclosureAccepted` starts with the Committed relay disclosure already accepted (for
 /// builds with `COMMITTED_RELAY_URL`; without it, a relay build shows the disclosure sheet).
@@ -140,8 +140,8 @@ enum ScreenshotFixture {
         ProcessInfo.processInfo.arguments.contains("-ScreenshotNoRelay")
     }
 
-    /// The board owner's notification choices, in memory: the defaults, with `-ScreenshotPasses`
-    /// and `-ScreenshotQuietHours <start>-<end>|off` applied.
+    /// The board owner's notification choices, in memory: the defaults, with `-ScreenshotPasses`,
+    /// `-ScreenshotQuietHours <start>-<end>|off` and `-ScreenshotResults off` applied.
     static func notificationPreferences() -> InMemoryNotificationPreferences {
         var choices = NotificationPreferences()
         if let passes = value(after: "-ScreenshotPasses").flatMap(NotificationPreferences.Passes.init(rawValue:)) {
@@ -151,6 +151,7 @@ enum ScreenshotFixture {
             let ends = hours.split(separator: "-").map(String.init)
             choices.quietHours = ends.count == 2 ? .init(start: ends[0], end: ends[1]) : nil
         }
+        if value(after: "-ScreenshotResults") == "off" { choices.results = false }
         return InMemoryNotificationPreferences([SampleServices.owner: choices])
     }
 
