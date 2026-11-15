@@ -1,8 +1,12 @@
-import type { ApnsRequest, ApnsResult, ApnsSender } from "../../src/apns";
+import type { AlertRequest, ApnsRequest, ApnsResult, ApnsSender, LiveActivityRequest } from "../../src/apns";
 
-/** Records every push and answers from a per-token script (default 200). */
+/**
+ * Records every push and answers from a per-token script (default 200). Live Activity pushes go in
+ * `sent`, alert notifications in `alerts`.
+ */
 export class FakeApns implements ApnsSender {
-  readonly sent: ApnsRequest[] = [];
+  readonly sent: LiveActivityRequest[] = [];
+  readonly alerts: AlertRequest[] = [];
   private readonly responses = new Map<string, ApnsResult>();
 
   respond(token: string, result: ApnsResult): void {
@@ -10,7 +14,8 @@ export class FakeApns implements ApnsSender {
   }
 
   async send(request: ApnsRequest): Promise<ApnsResult> {
-    this.sent.push(request);
+    if (request.pushType === "alert") this.alerts.push(request);
+    else this.sent.push(request);
     return this.responses.get(request.token) ?? { status: 200 };
   }
 
@@ -20,6 +25,7 @@ export class FakeApns implements ApnsSender {
 
   clear(): void {
     this.sent.length = 0;
+    this.alerts.length = 0;
   }
 }
 

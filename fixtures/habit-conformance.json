@@ -1,0 +1,225 @@
+{
+  "version": 1,
+  "about": "Shared habit-loop conformance cases (spec #124). Consumed by CommitStandingsTests/Habit*ConformanceTests.swift and relay/test/habit*.test.ts. Windows does not consume it. Expected values are worked by hand.",
+  "passes": [
+    {
+      "name": "A rival passes you",
+      "self": "me",
+      "previous": {
+        "me": 5,
+        "alice": 3
+      },
+      "current": {
+        "me": 5,
+        "alice": 7
+      },
+      "expected": [
+        {
+          "rival": "alice",
+          "direction": "rivalPassedMe",
+          "rivalContributions": 7,
+          "myContributions": 5,
+          "title": "😤 alice passed you",
+          "body": "They're ahead 7–5. Time to catch up!"
+        }
+      ]
+    },
+    {
+      "name": "You pass a rival",
+      "self": "me",
+      "previous": {
+        "me": 5,
+        "alice": 9
+      },
+      "current": {
+        "me": 12,
+        "alice": 9
+      },
+      "expected": [
+        {
+          "rival": "alice",
+          "direction": "iPassedRival",
+          "rivalContributions": 9,
+          "myContributions": 12,
+          "title": "🎉 You passed alice!",
+          "body": "You're ahead 12–9. Keep climbing!"
+        }
+      ]
+    },
+    {
+      "name": "A rival drops below you while you hold still",
+      "self": "me",
+      "previous": {
+        "me": 5,
+        "alice": 6
+      },
+      "current": {
+        "me": 5,
+        "alice": 4
+      },
+      "expected": [
+        {
+          "rival": "alice",
+          "direction": "iPassedRival",
+          "rivalContributions": 4,
+          "myContributions": 5,
+          "title": "🎉 You passed alice!",
+          "body": "You're ahead 5–4. Keep climbing!"
+        }
+      ]
+    },
+    {
+      "name": "Catching up to a tie fires nothing",
+      "self": "me",
+      "previous": {
+        "me": 5,
+        "alice": 3
+      },
+      "current": {
+        "me": 5,
+        "alice": 5
+      },
+      "expected": []
+    },
+    {
+      "name": "Holding a tie fires nothing",
+      "self": "me",
+      "previous": {
+        "me": 5,
+        "alice": 5
+      },
+      "current": {
+        "me": 6,
+        "alice": 6
+      },
+      "expected": []
+    },
+    {
+      "name": "Leaving a tie upward is a pass by the rival",
+      "self": "me",
+      "previous": {
+        "me": 5,
+        "alice": 5
+      },
+      "current": {
+        "me": 5,
+        "alice": 6
+      },
+      "expected": [
+        {
+          "rival": "alice",
+          "direction": "rivalPassedMe",
+          "rivalContributions": 6,
+          "myContributions": 5,
+          "title": "😤 alice passed you",
+          "body": "They're ahead 6–5. Time to catch up!"
+        }
+      ]
+    },
+    {
+      "name": "Leaving a tie downward is your pass",
+      "self": "me",
+      "previous": {
+        "me": 5,
+        "alice": 5
+      },
+      "current": {
+        "me": 7,
+        "alice": 5
+      },
+      "expected": [
+        {
+          "rival": "alice",
+          "direction": "iPassedRival",
+          "rivalContributions": 5,
+          "myContributions": 7,
+          "title": "🎉 You passed alice!",
+          "body": "You're ahead 7–5. Keep climbing!"
+        }
+      ]
+    },
+    {
+      "name": "No previous snapshot is silent",
+      "self": "me",
+      "previous": null,
+      "current": {
+        "me": 5,
+        "alice": 9
+      },
+      "expected": []
+    },
+    {
+      "name": "Your count missing now fires nothing",
+      "self": "me",
+      "previous": {
+        "me": 5,
+        "alice": 3
+      },
+      "current": {
+        "alice": 9
+      },
+      "expected": []
+    },
+    {
+      "name": "Your count missing before fires nothing",
+      "self": "me",
+      "previous": {
+        "alice": 3
+      },
+      "current": {
+        "me": 5,
+        "alice": 9
+      },
+      "expected": []
+    },
+    {
+      "name": "Someone new to the board is ignored",
+      "self": "me",
+      "previous": {
+        "me": 5
+      },
+      "current": {
+        "me": 5,
+        "bob": 9
+      },
+      "expected": []
+    },
+    {
+      "name": "Several crossings come ordered by login",
+      "self": "me",
+      "previous": {
+        "me": 5,
+        "cy": 4,
+        "bob": 9,
+        "alice": 3
+      },
+      "current": {
+        "me": 8,
+        "cy": 4,
+        "bob": 7,
+        "alice": 10
+      },
+      "expected": [
+        {
+          "rival": "alice",
+          "direction": "rivalPassedMe",
+          "rivalContributions": 10,
+          "myContributions": 8,
+          "title": "😤 alice passed you",
+          "body": "They're ahead 10–8. Time to catch up!"
+        },
+        {
+          "rival": "bob",
+          "direction": "iPassedRival",
+          "rivalContributions": 7,
+          "myContributions": 8,
+          "title": "🎉 You passed bob!",
+          "body": "You're ahead 8–7. Keep climbing!"
+        }
+      ]
+    }
+  ],
+  "weeks": [],
+  "rivalry": [],
+  "records": []
+}

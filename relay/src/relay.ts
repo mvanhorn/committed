@@ -4,6 +4,7 @@ import { Store, type InstallationRow, type Registration } from "./db";
 import { runCycle } from "./cycle";
 import { boardState, parseBoardQuery } from "./publicBoard";
 import type { LiveRankState } from "./liveRank";
+import { parsePreferences, type NotificationPreferences } from "./notifications/preferences";
 import { isValidTimeZone } from "./parser";
 import { selfFirst, WINDOWS, type Window } from "./ranking";
 import { widgetResponse } from "./widget";
@@ -99,6 +100,18 @@ export function createRelay(deps: RelayDeps) {
 
     const registration = parseRegistration(body);
     if (typeof registration === "string") return json(400, { error: registration });
+    // An installation exists while Live rank or relay notifications is on.
+    if (!registration.liveRank && registration.notifications === null) {
+      if (!existing) return new Response(null, { status: 204 });
+      await endActivity(existing);
+      await store.delete(id);
+      log("installation_deleted", { id, reason: "both_off" });
+      return new Response(null, { status: 204 });
+    }
+    if (existing && existing.live_rank && !registration.liveRank) {
+      // Live rank turned off: end its activity now; the cycle won't touch it again.
+      await endActivity(existing);
+    }
     if (!existing) {
       await store.create(id, secretHash, registration, deps.now());
       log("installation_created", { id, competitors: registration.competitors.length });
@@ -206,7 +219,12 @@ export function placeholderState(row: InstallationRow, now: number): LiveRankSta
 
 // MARK: - Validation
 
-const REGISTRATION_KEYS = new Set(["pushToStartToken", "login", "competitors", "window", "timeZone", "apnsEnvironment"]);
+const REGISTRATION_KEYS = new Set([
+  "pushToStartToken", "login", "competitors", "window", "timeZone", "apnsEnvironment",
+  // Spec #124. Optional: the 1.0.x apps send none of them.
+  "liveRank", "alertToken", "notifications", "rivals",
+]);
+export const MAX_RIVALS = 3;
 const ACTIVITY_KEYS = new Set(["activityId", "pushToken"]);
 
 /** Returns the registration, or an error code. Unknown keys are rejected so a GitHub token can't be accepted. */
@@ -231,13 +249,36 @@ function parseRegistration(body: unknown): Registration | string {
   if (typeof body.timeZone !== "string" || !isValidTimeZone(body.timeZone)) return "invalid_time_zone";
   if (body.apnsEnvironment !== "sandbox" && body.apnsEnvironment !== "production") return "invalid_apns_environment";
 
+  const liveRank = body.liveRank ?? true;
+  if (typeof liveRank !== "boolean") return "invalid_live_rank";
+  const alertToken = body.alertToken ?? null;
+  if (alertToken !== null && !(typeof alertToken === "string" && HEX_TOKEN.test(alertToken))) return "invalid_alert_token";
+  let notifications: NotificationPreferences | null = null;
+  if (body.notifications !== undefined && body.notifications !== null) {
+    const parsed = parsePreferences(body.notifications);
+    if (typeof parsed === "string") return parsed;
+    notifications = parsed;
+  }
+  const rawRivals = body.rivals ?? [];
+  if (!Array.isArray(rawRivals)) return "invalid_rivals";
+  const rivals = rawRivals.map(normalizeLogin);
+  if (rivals.some((rival) => rival === null)) return "invalid_rivals";
+  const uniqueRivals = [...new Set(rivals as string[])];
+  if (uniqueRivals.length > MAX_RIVALS) return "too_many_rivals";
+  if (uniqueRivals.some((rival) => rival === login || !competitors.includes(rival))) return "unknown_rival";
+
   return {
-    pushToStartToken: pushToStartToken as string | null,
+    // Live rank's tokens only while it's on, the alert token only while notifications are.
+    pushToStartToken: liveRank ? (pushToStartToken as string | null) : null,
     login,
     competitors,
     window: body.window as Window,
     timeZone: body.timeZone,
     apnsEnvironment: body.apnsEnvironment as ApnsEnvironment,
+    liveRank,
+    alertToken: notifications ? (alertToken as string | null) : null,
+    notifications,
+    rivals: uniqueRivals,
   };
 }
 
