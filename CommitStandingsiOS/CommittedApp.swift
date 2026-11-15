@@ -34,9 +34,9 @@ struct CommittedApp: App {
                 avatars: ScreenshotFixture.avatars(),
                 widgets: WidgetPublisher(),
                 notificationPreferences: ScreenshotFixture.notificationPreferences(),
-                notificationAuthorization: ScreenshotFixture.notificationsDenied
-                    ? { .denied }
-                    : { await UNUserNotificationCenter.current().notificationSettings().authorizationStatus },
+                notificationAuthorization: { [denied = ScreenshotFixture.notificationsDenied] in
+                    denied ? .denied : await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+                },
                 now: ScreenshotFixture.now
             )
             if let tab = ScreenshotFixture.requestedTab { model.selectedTab = tab }
