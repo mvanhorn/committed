@@ -134,6 +134,25 @@ struct NotificationsScreenTests {
         #expect(lastNotifications?.preferences.results == true)
     }
 
+    /// About you ▸ Records (#134): on by default, saved for this account and sent as `records`.
+    @Test func theRecordsSwitchIsOnByDefaultSavedAndSent() async throws {
+        agreedToRelayNotifications()
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+        #expect(model.notificationChoices.records)
+        #expect(lastNotifications?.preferences.records == true)
+
+        model.notificationChoice(\.records).wrappedValue = false
+        // The binding saves and re-registers in a task of its own: wait (up to 5 s) for it.
+        for _ in 0..<500 where lastNotifications?.preferences.records != false {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(model.notificationChoices.records == false)
+        #expect(choices.load(account: "me").records == false)
+        #expect(lastNotifications?.preferences.records == false)
+    }
+
     @Test func quietHoursOffReachTheRelayAsNull() async {
         agreedToRelayNotifications()
         let model = makeModel()

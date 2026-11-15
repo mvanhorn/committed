@@ -27,7 +27,8 @@ struct NotificationsScreen: View {
                 AboutYourRivalsSection()
                 if model.showsRelayNotificationChoices {
                     ResultsSection()
-                    // About you (#133, #134) and Delivery (#135) go here, in that order.
+                    AboutYouSection()
+                    // Delivery (#135) goes here.
                     QuietHoursSection()
                 }
             }
