@@ -48,6 +48,13 @@ enum DeepLink: Equatable, Sendable {
     /// it with their Challenge share, Open Board opens the Board. Nil for anything else (another kind,
     /// a dismissal, an unknown action), and the app just opens.
     init?(notification userInfo: [AnyHashable: Any], action: String = Self.bodyTapAction) {
+        // A streak reminder (#133) carries your own login: a tap opens your own view.
+        if userInfo["kind"] as? String == "streakReminder" {
+            guard action == Self.bodyTapAction,
+                  let login = (userInfo["login"] as? String).flatMap(UsernameNormalization.normalize) else { return nil }
+            self = .person(login: login)
+            return
+        }
         guard userInfo["kind"] as? String == "pass" else { return nil }
         let login = (userInfo["login"] as? String).flatMap(UsernameNormalization.normalize)
         switch action {

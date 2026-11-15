@@ -142,6 +142,25 @@ struct NotificationsScreenTests {
         #expect(relay.notifications.last == .some(nil))
     }
 
+    /// About you's Streak reminder switch (#133): off by default; turning it on through the
+    /// screen's binding saves it for this account and tells the relay.
+    @Test func theStreakReminderSwitchIsSavedAndReachesTheRelay() async {
+        agreedToRelayNotifications()
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+        let streakReminder = model.notificationChoice(\.streakReminder)
+        #expect(!streakReminder.wrappedValue)
+        #expect(lastNotifications?.preferences.streakReminder == false)
+
+        streakReminder.wrappedValue = true
+        for _ in 0..<200 where lastNotifications?.preferences.streakReminder != true { await Task.yield() }
+
+        #expect(streakReminder.wrappedValue)
+        #expect(choices.load(account: "me").streakReminder)
+        #expect(choices.load(account: "someone-else").streakReminder == false)
+        #expect(lastNotifications?.preferences.streakReminder == true)
+    }
+
     @Test func theSampleBoardSavesNoChoices() async {
         agreedToRelayNotifications()
         let model = makeModel(signedIn: false)

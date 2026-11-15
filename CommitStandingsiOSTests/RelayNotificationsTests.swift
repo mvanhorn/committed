@@ -274,6 +274,29 @@ struct RelayNotificationsTests {
         #expect(DeepLink(notification: ["kind": "result"]) == nil)
     }
 
+    // MARK: Streak reminder taps (#133)
+
+    @Test func aTappedStreakReminderOpensYourOwnView() async {
+        let (model, _) = makeModel()
+        await model.sceneDidBecomeActive()
+        model.selectedTab = .settings
+
+        let link = DeepLink(notification: ["kind": "streakReminder", "login": "Me", "aps": ["thread-id": "streak"]])
+        #expect(link == .person(login: "me"))
+        model.open(link!)
+
+        #expect(model.selectedTab == .board)
+        #expect(model.selectedPerson == "me")
+        #expect(model.shownPerson?.competitor.isSelf == true)
+    }
+
+    @Test func aStreakReminderOnlyOpensOnATap() {
+        let reminder: [AnyHashable: Any] = ["kind": "streakReminder", "login": "me"]
+        #expect(DeepLink(notification: reminder, action: "OPEN_BOARD") == nil)
+        #expect(DeepLink(notification: reminder, action: "com.apple.UNNotificationDismissActionIdentifier") == nil)
+        #expect(DeepLink(notification: ["kind": "streakReminder"]) == nil)
+    }
+
     // MARK: Pass actions (#137)
 
     @Test func challengeLinksRoundTrip() {

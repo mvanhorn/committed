@@ -30,7 +30,8 @@ import UIKit
 /// `-LiveRankPayload <file.json>` shows a Live Activity push payload's content state in Live rank,
 /// `-ScreenshotNotifications` opens Settings ▸ Notifications (with `-ScreenshotTab settings`),
 /// `-ScreenshotPasses rivals` and `-ScreenshotQuietHours 23:30-07:00` (or `off`) set the board
-/// owner's notification choices, `-ScreenshotNotificationsDenied` reads iOS's permission as denied,
+/// owner's notification choices (`-ScreenshotStreakReminder` turns on About you's Streak reminder),
+/// `-ScreenshotNotificationsDenied` reads iOS's permission as denied,
 /// `-ScreenshotNoRelay` runs a relay build as one without the relay,
 /// and `-RelayDisclosureAccepted` starts with the Committed relay disclosure already accepted (for
 /// builds with `COMMITTED_RELAY_URL`; without it, a relay build shows the disclosure sheet).
@@ -141,11 +142,14 @@ enum ScreenshotFixture {
     }
 
     /// The board owner's notification choices, in memory: the defaults, with `-ScreenshotPasses`
-    /// and `-ScreenshotQuietHours <start>-<end>|off` applied.
+    /// `-ScreenshotQuietHours <start>-<end>|off` and `-ScreenshotStreakReminder` applied.
     static func notificationPreferences() -> InMemoryNotificationPreferences {
         var choices = NotificationPreferences()
         if let passes = value(after: "-ScreenshotPasses").flatMap(NotificationPreferences.Passes.init(rawValue:)) {
             choices.passes = passes
+        }
+        if ProcessInfo.processInfo.arguments.contains("-ScreenshotStreakReminder") {
+            choices.streakReminder = true
         }
         if let hours = value(after: "-ScreenshotQuietHours") {
             let ends = hours.split(separator: "-").map(String.init)
