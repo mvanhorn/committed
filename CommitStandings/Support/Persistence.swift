@@ -145,3 +145,34 @@ final class InMemoryHiddenPeoplePersistence: HiddenPeoplePersistence, @unchecked
     func load() -> [String: Set<String>] { storage }
     func save(_ hiddenByAccount: [String: Set<String>]) { storage = hiddenByAccount }
 }
+
+// MARK: - Per-account pinned rivals
+
+/// Each GitHub account's pinned rivals, in the order they were pinned.
+protocol PinnedRivalsPersistence: Sendable {
+    func load() -> [String: [String]]
+    func save(_ pinnedByAccount: [String: [String]])
+}
+
+final class UserDefaultsPinnedRivalsPersistence: PinnedRivalsPersistence, @unchecked Sendable {
+    private let defaults: UserDefaults
+    private let key = "pinnedRivalsByAccount.v1"
+
+    init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+
+    func load() -> [String: [String]] {
+        guard let data = defaults.data(forKey: key) else { return [:] }
+        return (try? JSONDecoder().decode([String: [String]].self, from: data)) ?? [:]
+    }
+
+    func save(_ pinnedByAccount: [String: [String]]) {
+        guard let data = try? JSONEncoder().encode(pinnedByAccount) else { return }
+        defaults.set(data, forKey: key)
+    }
+}
+
+final class InMemoryPinnedRivalsPersistence: PinnedRivalsPersistence, @unchecked Sendable {
+    private var storage: [String: [String]] = [:]
+    func load() -> [String: [String]] { storage }
+    func save(_ pinnedByAccount: [String: [String]]) { storage = pinnedByAccount }
+}

@@ -55,6 +55,10 @@ struct StandingRowStyle {
     var streakTextStyle: Font.TextStyle = .caption
     /// The mark's own color. nil = the number's (`streakColor`).
     var streakMarkColor: Color? = nil
+    /// The line under the name, when a row has one (the iPhone's Your rivals: "3 to pass"). nil
+    /// color = `.secondary`.
+    var captionFont: Font = .caption
+    var captionColor: Color? = nil
 
     /// The contribution square right of the count.
     var squares: Squares = .symbol

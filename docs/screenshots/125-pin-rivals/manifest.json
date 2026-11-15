@@ -1,0 +1,55 @@
+{
+  "device": "iPhone Duo Simulator (closed, outer display, portrait)",
+  "os": "iOS 27.1",
+  "notes": "Ticket #125 (spec #124). Runtime captures of the Debug app on the shared iPhone Duo (94D56458-…) with the screenshot fixture (Sample board data): -ScreenshotFixture -ScreenshotDate 2026-11-15T19:00:00Z, plus -ScreenshotPin / -ScreenshotPerson / -ScreenshotWindow / -ScreenshotRivalLimit per capture. Mac unchanged: CommitStandingsTests/StandingRowRenderTests (RENDER_DIR) rendered byte-identical PNGs, dark and light, on origin/spec/124-habit-loop (43044bd) and on this commit. Baseline missing: no capture was taken from the base commit; with no pins the Board draws the same as before (no Your rivals section, its usual \"6 people · Today\" header), but that state isn't in this set (its capture showed Connect GitHub because the first launch after install didn't open the fixture board, so it was dropped). Every Rival state was reached through launch flags, not taps. Not captured: the open iPhone Duo's second pane (PersonPane with Rival beside GitHub); the Duo can't be opened headlessly here.",
+  "screenshots": [
+    {
+      "file": "board-your-rivals.png",
+      "caption": "Board, Today, odile-m and ezra-q pinned: Your rivals between your summary and the list, rows with rank and the gap (\"2 to pass\", \"1 ahead\"), list headed \"Everyone · 6 people\"",
+      "capture": {
+        "sourceCommit": "41929007b15fadb914ae670d829c168d21000f3e",
+        "fixture": true
+      }
+    },
+    {
+      "file": "board-your-rivals-30-days.png",
+      "caption": "Board, 30 days, same pins: ranks and gaps follow the Window (\"27 to pass\" matches the summary's \"27 to pass odile-m\", \"11 ahead\")",
+      "capture": {
+        "sourceCommit": "41929007b15fadb914ae670d829c168d21000f3e",
+        "fixture": true
+      }
+    },
+    {
+      "file": "person-rival.png",
+      "caption": "odile-m's view, not pinned: Rival (pin outline) beside GitHub in the top bar",
+      "capture": {
+        "sourceCommit": "41929007b15fadb914ae670d829c168d21000f3e",
+        "fixture": true
+      }
+    },
+    {
+      "file": "person-pinned.png",
+      "caption": "odile-m's view, pinned: Pinned (filled pin) beside GitHub",
+      "capture": {
+        "sourceCommit": "41929007b15fadb914ae670d829c168d21000f3e",
+        "fixture": true
+      }
+    },
+    {
+      "file": "person-limit.png",
+      "caption": "bram-ott's view with three rivals already pinned: Rival explains \"You can pin up to 3 rivals\" (opened by the -ScreenshotRivalLimit fixture flag, as a tap would)",
+      "capture": {
+        "sourceCommit": "41929007b15fadb914ae670d829c168d21000f3e",
+        "fixture": true
+      }
+    },
+    {
+      "file": "person-yours.png",
+      "caption": "Your own view (ari-linden): no Rival button, GitHub only",
+      "capture": {
+        "sourceCommit": "41929007b15fadb914ae670d829c168d21000f3e",
+        "fixture": true
+      }
+    }
+  ]
+}

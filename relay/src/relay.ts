@@ -3,6 +3,7 @@ import { boardError, competitorsOf, loginData, readBoard, type LoginData } from 
 import { Store, type InstallationRow, type Registration } from "./db";
 import { runCycle } from "./cycle";
 import { boardState, parseBoardQuery } from "./publicBoard";
+import { parseRaceQuery, raceState } from "./race";
 import type { LiveRankState } from "./liveRank";
 import { isValidTimeZone } from "./parser";
 import { selfFirst, WINDOWS, type Window } from "./ranking";
@@ -44,6 +45,8 @@ const HEX_TOKEN = /^[0-9a-f]{16,512}$/;
 // GitHub logins: alphanumerics and single hyphens, 1–39 chars (UsernameNormalization in Swift).
 const LOGIN_PATTERN = /^[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){0,38}$/;
 
+const PUBLIC_CORS = { "access-control-allow-origin": "*" };
+
 export const defaultLog: Log = (event, fields = {}) => {
   console.log(JSON.stringify({ event, ...fields }));
 };
@@ -56,6 +59,7 @@ export function createRelay(deps: RelayDeps) {
     const url = new URL(request.url);
     if (url.pathname === "/" && request.method === "GET") return text(200, "Committed relay");
     if (url.pathname === "/v1/board") return board(request, url);
+    if (url.pathname === "/v1/race") return race(request, url);
 
     const widget = widgetResponse(request, url);
     if (widget) return widget;
@@ -138,22 +142,47 @@ export function createRelay(deps: RelayDeps) {
     return Response.json(board, { headers: { "cache-control": "private, max-age=60", vary: "Authorization" } });
   }
 
-  /** Public read for the NZXT Kraken LCD page. Any origin may read it: it serves public counts only. */
-  async function board(request: Request, url: URL): Promise<Response> {
-    const cors = { "access-control-allow-origin": "*" };
+  /**
+   * The checks every public read shares: GET only, readable from any origin (they serve public
+   * counts only), rate limited per IP. A response to return as is, or null to go on.
+   */
+  async function publicReadGate(request: Request, limiterKey: (ip: string) => string): Promise<Response | null> {
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: { ...cors, "access-control-allow-methods": "GET" } });
+      return new Response(null, { status: 204, headers: { ...PUBLIC_CORS, "access-control-allow-methods": "GET" } });
     }
-    if (request.method !== "GET") return json(405, { error: "method_not_allowed" }, cors);
+    if (request.method !== "GET") return json(405, { error: "method_not_allowed" }, PUBLIC_CORS);
     if (deps.boardLimiter) {
       const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
-      if (!(await deps.boardLimiter.limit({ key: ip })).success) return json(429, { error: "rate_limited" }, cors);
+      if (!(await deps.boardLimiter.limit({ key: limiterKey(ip) })).success) {
+        return json(429, { error: "rate_limited" }, PUBLIC_CORS);
+      }
     }
+    return null;
+  }
+
+  /** Public read for the NZXT Kraken LCD page. */
+  async function board(request: Request, url: URL): Promise<Response> {
+    const gate = await publicReadGate(request, (ip) => ip);
+    if (gate) return gate;
     const query = parseBoardQuery(url.searchParams, normalizeLogin);
-    if (typeof query === "string") return json(400, { error: query }, cors);
+    if (typeof query === "string") return json(400, { error: query }, PUBLIC_CORS);
     const state = await boardState(query, { store, github: deps.github, log, now: deps.now() });
     log("board_read", { competitors: query.competitors.length });
-    return json(200, state, { ...cors, "cache-control": "public, max-age=60" });
+    return json(200, state, { ...PUBLIC_CORS, "cache-control": "public, max-age=60" });
+  }
+
+  /** Public read for the challenge page (gitcommitted.app/vs/<login>/<rival>). */
+  async function race(request: Request, url: URL): Promise<Response> {
+    // Its own budget per IP, so challenge pages and the Kraken page don't use up each other's.
+    const gate = await publicReadGate(request, (ip) => `race:${ip}`);
+    if (gate) return gate;
+    const query = parseRaceQuery(url.searchParams, normalizeLogin);
+    if (typeof query === "string") return json(400, { error: query }, PUBLIC_CORS);
+    const state = await raceState(query, { store, github: deps.github, log, now: deps.now() });
+    log("race_read", { found: state !== null });
+    // Not cached publicly: a login that's new to GitHub, or a GitHub outage, should clear up on the next read.
+    if (!state) return json(404, { error: "unknown_login" }, PUBLIC_CORS);
+    return json(200, state, { ...PUBLIC_CORS, "cache-control": "public, max-age=60" });
   }
 
   async function allowWrite(row: InstallationRow): Promise<boolean> {

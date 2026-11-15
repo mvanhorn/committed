@@ -1,6 +1,8 @@
 # Marketing site design and maintenance
 
-The static site lives in `site/`, alongside the native Xcode project. Build and
+The site lives in `site/`, alongside the native Xcode project. Every page is
+prerendered static HTML except the challenge page (`/vs/<challenger>/<friend>`), which
+renders on request. Build and
 verification commands are in [README.md](README.md).
 
 ## Design decisions
@@ -53,10 +55,15 @@ verification commands are in [README.md](README.md).
   public-data snapshot; animation frames illustrate rank changes rather than replaying
   recorded events. See the demo notes in [README.md](README.md).
 - Keep global `text-pretty`, reduced-motion handling, and the shared pause control.
+- The challenge page (spec #124, ticket #128) is written from the friend's side, with the
+  copy fixed by the spec. It reuses the site header, footer and `SquareField` (the race card
+  is its `data-field-desk`), and shows all three downloads at once, iPhone first, because a
+  challenge arrives on a phone. It's `noindex` and never in the sitemap.
 
 ## Build and deployment
 
-Use Node 22 and `npm ci`; `npm run build` exports the site to `out/`. Production is
+Use Node 22 and `npm ci`; `npm run build` builds the site into `.next/` and `npm start`
+serves it (`output: "export"` was dropped for the challenge page's per-pair metadata). Production is
 [gitcommitted.app](https://gitcommitted.app), deployed by Vercel from
 `prompthunt/committed`, branch `main`, root `site`. Cloudflare manages DNS.
 Leave Vercel's Output Directory override unset. PNG response headers for extensionless
