@@ -167,7 +167,7 @@ The **Committed relay** is a small push service that keeps Live rank current whi
 - **What it never receives:** your GitHub token, which is sent only to GitHub. The relay reads the same public contribution pages as the apps, anonymously.
 - **The Kraken page's reads** send a username, its rivals, the Window and a time zone with each request. The relay stores nothing from them beyond the shared per-username contribution cache.
 - **The challenge page's reads** (`GET /v1/race`, below) send the two usernames in the link. Like the Kraken page's, they're public, unauthenticated, and store nothing beyond that cache.
-- **When the iPhone updates it:** when you hide or show someone, change Live rank's Window, when a people sync changes who's on your board, when your time zone changes, and when Apple issues a new push token.
+- **When the iPhone updates it:** when you hide or show someone, pin or unpin a rival, change a notification choice, change Live rank's Window, when a people sync changes who's on your board, when your time zone changes, and when Apple issues a new push token.
 - **Turning off both Live rank and Passes, or Disconnect GitHub,** deletes the iPhone's registration and ends Live rank. Turning off only one keeps the other going.
 
 ### Committed for NZXT Kraken

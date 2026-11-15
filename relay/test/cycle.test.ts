@@ -825,6 +825,13 @@ describe("relay notifications: passes", () => {
       expect(aps.alert.title).toBe("😤 alice passed you");
     });
 
+    it("stays passive after local midnight, until quiet hours end", async () => {
+      // 03:00 on Nov 5 in New York is still inside 22:00–08:00.
+      const aps = await passAt(at(3, 0));
+      expect(aps["interruption-level"]).toBe("passive");
+      expect(aps.sound).toBeUndefined();
+    });
+
     it("plays the sound outside quiet hours", async () => {
       const aps = await passAt(at(21, 59));
       expect(aps.sound).toBe("default");
