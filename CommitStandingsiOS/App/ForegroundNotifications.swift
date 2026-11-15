@@ -3,15 +3,29 @@ import UserNotifications
 /// iOS hides a notification that arrives while its app is open unless the app says otherwise.
 /// Leaderboard Notifications show as a banner even while Committed is open, whether the app posted
 /// them or the Committed relay sent them. Tapping one opens Committed where it points: a pass opens
-/// that person's view. The Mac app doesn't need this.
+/// that person's view, and a relay pass's actions (#137) open it with the Challenge share (Share
+/// your race) or open the Board (Open Board). The Mac app doesn't need this.
 final class ForegroundNotificationPresenter: NSObject, UNUserNotificationCenterDelegate, Sendable {
     static let shared = ForegroundNotificationPresenter()
 
     /// The notification center keeps its delegate weakly; `shared` keeps this one alive. Installed
-    /// at launch, so a tap that launched the app is delivered too.
+    /// at launch, with the categories, so a tap or action that launched the app is delivered too.
     @MainActor
     static func install() {
-        UNUserNotificationCenter.current().delegate = shared
+        let center = UNUserNotificationCenter.current()
+        center.delegate = shared
+        center.setNotificationCategories(categories)
+    }
+
+    /// The relay's pass notifications carry `PASS`: Share your race and Open Board, each opening
+    /// Committed (the in-app crossing notifications have no category, so no actions).
+    static var categories: Set<UNNotificationCategory> {
+        let shareRace = UNNotificationAction(
+            identifier: DeepLink.shareRaceAction, title: "Share your race", options: .foreground)
+        let openBoard = UNNotificationAction(
+            identifier: DeepLink.openBoardAction, title: "Open Board", options: .foreground)
+        return [UNNotificationCategory(
+            identifier: DeepLink.passCategory, actions: [shareRace, openBoard], intentIdentifiers: [])]
     }
 
     /// Where taps go. A tap that arrives before the app attaches it (a cold launch) waits for it.
@@ -36,7 +50,8 @@ final class ForegroundNotificationPresenter: NSObject, UNUserNotificationCenterD
     func userNotificationCenter(
         _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
     ) async {
-        guard let link = DeepLink(notification: response.notification.request.content.userInfo) else { return }
+        guard let link = DeepLink(notification: response.notification.request.content.userInfo,
+                                  action: response.actionIdentifier) else { return }
         await MainActor.run {
             if let open = Self.open {
                 open(link)
