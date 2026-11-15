@@ -266,6 +266,24 @@ struct RelayNotificationsTests {
         #expect(model.selectedPerson == nil)
     }
 
+    /// A record notification (#134) carries your own login: tapping it opens your own view.
+    @Test func aTappedRecordOpensYourOwnView() async {
+        let (model, _) = makeModel()
+        await model.sceneDidBecomeActive()
+        model.selectedTab = .settings
+
+        let link = DeepLink(notification: ["kind": "record", "login": "me", "aps": ["thread-id": "records"]])
+        #expect(link == .person(login: "me"))
+        model.open(link!)
+
+        #expect(model.selectedTab == .board)
+        #expect(model.selectedPerson == "me")
+        #expect(model.shownPerson?.competitor.username == "me")
+        // A record has no actions of its own.
+        #expect(DeepLink(notification: ["kind": "record", "login": "me"], action: "OPEN_BOARD") == nil)
+        #expect(DeepLink(notification: ["kind": "record"]) == nil)
+    }
+
     @Test func personLinksRoundTrip() {
         #expect(DeepLink.person(login: "ada").url.absoluteString == "committed://person/ada")
         #expect(DeepLink(url: URL(string: "committed://person/Ada")!) == .person(login: "ada"))
