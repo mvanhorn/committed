@@ -61,6 +61,12 @@ enum ScreenshotFixture {
         ProcessInfo.processInfo.arguments.contains("-ScreenshotPersonEnd")
     }
 
+    /// `-ScreenshotSheetEnd`: the relay sheets open scrolled to their end, so captures on the closed
+    /// iPhone Duo show their last lines (the notifications line).
+    static var sheetScrolledToEnd: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotSheetEnd")
+    }
+
     /// `-ScreenshotConnect`: start Connect GitHub on launch, as a tap would, so captures can show
     /// its code (for example over the Sample board). Honored on any Debug launch. It asks GitHub
     /// for a real device code; nothing connects unless someone approves it.

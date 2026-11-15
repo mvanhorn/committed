@@ -42,6 +42,7 @@ struct LiveRankDisclosureView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)
             }
+            .defaultScrollAnchor(relaySheetScrollAnchor)
             .background {
                 ZStack(alignment: .top) {
                     Color.ink
@@ -122,4 +123,13 @@ struct RelayPoint: View {
         .padding(.vertical, 14)
         .accessibilityElement(children: .combine)
     }
+}
+
+/// Where the relay sheets open: the top, or the end for fixture captures (`-ScreenshotSheetEnd`).
+@MainActor
+var relaySheetScrollAnchor: UnitPoint {
+    #if DEBUG
+    if ScreenshotFixture.sheetScrolledToEnd { return .bottom }
+    #endif
+    return .top
 }
