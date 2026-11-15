@@ -528,9 +528,12 @@ final class AppModel {
         if pending.isFirst {
             // Passes, as Leaderboard Notifications did, is on at once (in the app) and goes back off
             // if denied. Any other switch only asks: nothing is saved before it's agreed to.
-            let granted = isPasses
-                ? await services.notifications.setEnabled(true)
-                : await services.notifications.requestAuthorization()
+            let granted: Bool
+            if isPasses {
+                granted = await services.notifications.setEnabled(true)
+            } else {
+                granted = await services.notifications.requestAuthorization()
+            }
             notificationChoicesRevision += 1
             guard granted else {
                 await checkNotificationPermission()
