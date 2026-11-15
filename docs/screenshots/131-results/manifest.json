@@ -1,0 +1,43 @@
+{
+  "device": "iPhone Duo Simulator (shared persistent Duo 94D56458-B90B-484A-BA5E-16748D2CBEE5), closed, portrait",
+  "os": "iOS 27.1",
+  "notes": "Runtime captures, not renders. The switch's states and quiet hours are set through the fixture (no tap access from the agent). Captured before the any-switch gate (ticket/130-gate) merged, so Passes is on in every capture. Tapping a result notification (opens the Board) is covered by RelayNotificationsTests, not captured. The open iPhone Duo and accessibility text sizes were not captured.",
+  "screenshots": [
+    {
+      "file": "before-notifications.png",
+      "caption": "Before (spec/124-habit-loop with #132): About your rivals, then Quiet hours; no Results section. Copied from docs/screenshots/132-close-calls/notifications-close-calls-off.png",
+      "capture": {
+        "sourceCommit": "48927530b257356718d5e538fc29d4d758d82481",
+        "fixture": true
+      },
+      "notes": "Captured for #132 with the same fixture flags (-ScreenshotTab settings -ScreenshotNotifications)."
+    },
+    {
+      "file": "notifications-results-on.png",
+      "caption": "After: Results section between About your rivals and Quiet hours, Daily and weekly results on by default; footer \"Yesterday’s finish each morning at 8:00 AM, and last week’s final on Mondays.\"",
+      "capture": {
+        "sourceCommit": "220388f5b737335fe09609335ae61b923ab25296",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -ScreenshotTab settings -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotNotifications."
+    },
+    {
+      "file": "notifications-results-off.png",
+      "caption": "Daily and weekly results off; footer \"Turn on for a morning note of how yesterday went.\"",
+      "capture": {
+        "sourceCommit": "220388f5b737335fe09609335ae61b923ab25296",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -ScreenshotTab settings -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotNotifications -ScreenshotResults off."
+    },
+    {
+      "file": "notifications-results-quiet-hours.png",
+      "caption": "Quiet hours 11:30 PM to 7:00 AM: the footer moves the results to 7:00 AM, when quiet hours end (the Start and End rows are below the fold)",
+      "capture": {
+        "sourceCommit": "220388f5b737335fe09609335ae61b923ab25296",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -ScreenshotTab settings -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotNotifications -ScreenshotQuietHours 23:30-07:00."
+    }
+  ]
+}
