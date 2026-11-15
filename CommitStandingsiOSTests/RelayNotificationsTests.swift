@@ -165,7 +165,9 @@ struct RelayNotificationsTests {
         acceptedEarlierSheet()
         let (model, _) = makeModel(signedIn: false, notificationsOn: true)
         await model.startSampleBoard()
-        await model.leaderboardNotificationsChanged(true)
+        // (The Sample board's own switch would show the real iOS permission prompt, which a test
+        // host can't answer, so this checks what the switch leads to without flipping it.)
+        await model.syncRelayNotifications()
 
         #expect(!model.isShowingRelayNotificationsConsent)
         #expect(!model.isShowingLiveRankDisclosure)
@@ -241,7 +243,7 @@ struct RelayNotificationsTests {
 
         #expect(model.selectedTab == .board)
         #expect(model.selectedPerson == "ada")
-        #expect(model.shownPerson?.username == "ada")
+        #expect(model.shownPerson?.competitor.username == "ada")
     }
 
     @Test func aPassAboutSomeoneNoLongerOnTheBoardOpensTheBoard() async {

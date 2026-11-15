@@ -456,7 +456,8 @@ struct LiveRankRelayRequestTests {
                                         timeZone: "UTC", apnsEnvironment: "production")),
             baseURL: base, installation: credentials
         )
-        let body = try #require(JSONSerialization.jsonObject(with: try #require(request.httpBody)) as? [String: Any])
+        let data = try #require(request.httpBody)
+        let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
         #expect(body["notifications"] is NSNull)
         #expect(body["alertToken"] is NSNull)
         #expect(body["liveRank"] as? Bool == true)
