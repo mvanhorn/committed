@@ -131,6 +131,9 @@ struct PersonSummary: Equatable, Sendable {
     let days: Days?
     /// Your race with them, on a rival's view once both your calendars load. nil on your own view.
     var race: Race? = nil
+    /// Your weekly record against them (`RivalryRecord`), on someone else's view once you both have
+    /// a finished week. nil on your own view.
+    var rivalry: RivalryRecord? = nil
 
     var login: String { competitor.username }
     var isYou: Bool { competitor.isSelf }
@@ -342,7 +345,15 @@ extension StandingsStore {
             )
         }
         return PersonSummary(competitor: competitor, status: status, month: month, dayOfMonth: dayOfMonth,
-                             days: days, race: race)
+                             days: days, race: race, rivalry: rivalry(with: login, asOf: reference))
+    }
+
+    /// Your weekly record against `login` as of `reference`, in your calendar's weeks: nil for
+    /// yourself, before both calendars load, or before a finished week you both have.
+    func rivalry(with login: String, asOf reference: Date) -> RivalryRecord? {
+        guard let me = selfCompetitor?.username, me != login, let mine = history(for: me),
+              let theirs = history(for: login) else { return nil }
+        return RivalryRecord.between(you: mine, them: theirs, asOf: reference)
     }
 }
 

@@ -110,6 +110,12 @@ struct PersonViewContent<Tip: View, RaceAccessory: View, UnderStats: View>: View
                         // Beside the card, not in it: the card reads as one VoiceOver element.
                         raceAccessory
                     }
+                    #if os(iOS)
+                    // The iPhone's Weekly record, under Your race (`WeeklyRecordCard`, iPhone app only).
+                    if let rivalry = person.rivalry {
+                        WeeklyRecordCard(record: rivalry, login: person.login)
+                    }
+                    #endif
                     stats(days)
                     underStats
                 }
