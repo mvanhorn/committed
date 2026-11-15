@@ -29,8 +29,8 @@ import UIKit
 /// the thousands beside the streaks, the board's widest rows), and
 /// `-LiveRankPayload <file.json>` shows a Live Activity push payload's content state in Live rank,
 /// `-ScreenshotNotifications` opens Settings ▸ Notifications (with `-ScreenshotTab settings`),
-/// `-ScreenshotPasses rivals`, `-ScreenshotCloseCalls` and `-ScreenshotQuietHours 23:30-07:00` (or `off`) set the board
-/// owner's notification choices (`-ScreenshotStreakReminder` turns on About you's Streak reminder),
+/// `-ScreenshotPasses rivals`, `-ScreenshotCloseCalls`, `-ScreenshotRecords off`, `-ScreenshotStreakReminder` and
+/// `-ScreenshotQuietHours 23:30-07:00` (or `off`) set the board owner's notification choices,
 /// `-ScreenshotNotificationsDenied` reads iOS's permission as denied,
 /// `-ScreenshotNoRelay` runs a relay build as one without the relay,
 /// and `-RelayDisclosureAccepted` starts with the Committed relay disclosure already accepted (for
@@ -147,8 +147,8 @@ enum ScreenshotFixture {
     }
 
     /// The board owner's notification choices, in memory: the defaults, with `-ScreenshotPasses`,
-    /// `-ScreenshotCloseCalls` (Close calls on), `-ScreenshotQuietHours <start>-<end>|off` and
-    /// `-ScreenshotStreakReminder` applied.
+    /// `-ScreenshotCloseCalls` (Close calls on), `-ScreenshotRecords off`, `-ScreenshotStreakReminder`
+    /// (Streak reminder on) and `-ScreenshotQuietHours <start>-<end>|off` applied.
     static func notificationPreferences() -> InMemoryNotificationPreferences {
         var choices = NotificationPreferences()
         if let passes = value(after: "-ScreenshotPasses").flatMap(NotificationPreferences.Passes.init(rawValue:)) {
@@ -156,6 +156,9 @@ enum ScreenshotFixture {
         }
         if ProcessInfo.processInfo.arguments.contains("-ScreenshotCloseCalls") {
             choices.closeCalls = true
+        }
+        if value(after: "-ScreenshotRecords") == "off" {
+            choices.records = false
         }
         if ProcessInfo.processInfo.arguments.contains("-ScreenshotStreakReminder") {
             choices.streakReminder = true

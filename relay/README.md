@@ -518,6 +518,18 @@ WIDGET_SCREENS=/some/dir npm run test:browser   # also save a screenshot of each
      }
      ```
 
+   - **Records** (`records.ts`, with `records: true`) port the best day, best week and longest
+     streak of `PersonalRecords` (#127): each is announced the first time it's broken in its day
+     or week, only when its old best is at least 5 (best day), 1 (best week) or 7 days (streak).
+     Equalling isn't a record. One alert per record, `thread-id: "records"`,
+     `apns-collapse-id: record.<id>`, `"kind": "record"` and your own `login`, which the app opens:
+     "New best day" / "41 today. Your old best was 33, on March 4.", "New best week" /
+     "186 so far this week. Your old best was 171.", "Your longest streak yet" /
+     "53 days, past your old best of 52.". A record due during quiet hours is held until they
+     end, then sent with the day's (or week's) latest number, saying "yesterday" or "last week"
+     when its day or week is over. Finding records and sending them (`sendRecordsNow`) are
+     separate steps, so the evening summary (#135) can take them instead. State:
+     `{"records": {"sent": [ids], "held": [records]}}`; turning Records off drops what's held.
    - **Streak reminder** (`streakReminder.ts`, with `streakReminder: true`): "Your 40-day
      streak" / "Nothing yet today. It keeps going if you contribute by midnight." Due from 8 PM
      local, or an hour before quiet hours start when that falls between noon and 8 PM, while
@@ -542,7 +554,9 @@ APNs auth is an ES256 JWT signed with WebCrypto from the `.p8` key and cached fo
 `passes` cases run against `RankChangeDetector` and `NotificationService.copy(for:)` in
 `CommitStandingsTests/HabitPassConformanceTests.swift`, and against `src/notifications/passes.ts`
 in `test/habitPasses.test.ts`, so a pass the app would post is the pass the relay sends, in the
-same words.
+same words. Its `records` cases run against `PersonalRecords` in
+`CommitStandingsTests/HabitRecordConformanceTests.swift`, and against `src/notifications/records.ts`
+in `test/habitRecords.test.ts` (best day, best week, longest streak and what's broken today).
 
 `../fixtures/ranking-conformance.json` is shared with the Mac test target and the Windows core
 (`windows/core/tests/conformance.rs`, which checks `order` and streaks: Windows has no Live rank),
