@@ -1,14 +1,18 @@
 # gitcommitted.app — marketing site
 
 The one-page site for **Committed**, built with Next.js (App Router) + TypeScript + Tailwind v4.
-It is fully static: `npm run build` writes plain HTML/CSS/JS to `out/`.
+Every page is prerendered to static HTML at build time except the challenge page
+(`/vs/<challenger>/<friend>`), which renders on request so each pair's title and link-preview
+image are in the HTML that Messages and other crawlers read.
 
 ```bash
 cd site
 npm ci             # Node 22 (see .nvmrc)
 npm run dev        # http://localhost:3000
-npm run build      # static export → site/out/
+npm run build      # production build → site/.next/
+npm start          # serve that build (next start), http://localhost:3000
 npm run typecheck
+npm test           # unit tests: download platform, challenge page view model, sitemap
 ```
 
 ## What's here
@@ -27,6 +31,9 @@ npm run typecheck
 | `lib/site.ts` | Page title, description and FAQ copy, shared by the metadata, the page and the JSON-LD |
 | `lib/glyph.ts` | The GitHub-cat trophy mark (from `MenuBarIcon.pdf`) as an SVG path |
 | `public/avatars/` | GitHub avatars for the demo board (public use approved by the owner) |
+| `app/vs/[challenger]/[friend]/` | The challenge page and its link-preview image (`opengraph-image.tsx`), rendered on request, `noindex` |
+| `lib/challenge.ts`, `lib/challenge-race.ts` | The challenge page's words and numbers from the friend's side (tested in `lib/challenge.test.mjs`), and its read of the relay's `GET /v1/race` (`NEXT_PUBLIC_COMMITTED_RELAY_URL`, cached 60 s) |
+| `components/RaceCard.tsx`, `components/ChallengeDownloads.tsx` | The challenge's race card, and its iPhone, Mac and Windows downloads |
 | `app/icon.svg`, `app/opengraph-image.tsx` | Favicon and social card, generated at build |
 | `app/fonts/` | Inter Tight fonts for the social card and their SIL Open Font License |
 | `app/apple-icon.tsx`, `app/robots.ts`, `app/sitemap.ts` | Touch icon and crawler metadata, generated at build |
@@ -55,8 +62,14 @@ release gate still applies to every link. Run `npm test` for detection cases.
 Production runs on **Vercel**, connected to `prompthunt/committed`. The project
 root is `site`, with the Next.js preset, Node `22.x`, `npm run build`, production
 branch `main`, and pull-request previews. Leave the Output Directory override empty;
-Vercel's Next.js builder handles the static export. `vercel.json` supplies PNG MIME
-types for extensionless generated images.
+Vercel's Next.js builder serves the build: static pages from the CDN, the challenge page
+and its image from a function. `vercel.json` supplies PNG MIME types for extensionless
+generated images. The challenge image reads `app/fonts` at request time;
+`outputFileTracingIncludes` in `next.config.ts` ships them with the function.
+
+The challenge page reads the relay from Vercel's servers, whose outbound IPs are shared, and
+the relay limits `/v1/race` per IP (20 a minute). Each pair's page and image reuse one read
+for a minute, so the limit only bites when many different pairs are opened at once.
 
 The domain and DNS remain on Cloudflare. Use Vercel's current project-specific DNS
 recommendation when configuring a deployment. Vercel manages HTTPS and redirects
