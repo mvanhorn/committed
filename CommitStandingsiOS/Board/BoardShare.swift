@@ -266,7 +266,8 @@ struct BoardShareFooter: View {
 }
 
 /// The contribution graph's squares behind everything, as on the site: mostly empty, some green,
-/// the odd lime one. The same pattern every time, brightest at the edges.
+/// the odd lime one. The same pattern every time, brightest at the edges. Challenge's story image
+/// draws it too.
 struct BoardShareSquareField: View {
     let brightness: Double
 
@@ -405,22 +406,11 @@ struct BoardShareSheet: View {
         }
         // The image alone: no title or caption rides along into the post or message.
         .sheet(item: $sharing) { file in
-            BoardShareActivity(url: file.url)
+            ShareActivity(items: [file.url])
                 .presentationDetents([.medium, .large])
                 .ignoresSafeArea()
         }
     }
-}
-
-/// The system share sheet with only the PNG.
-struct BoardShareActivity: UIViewControllerRepresentable {
-    let url: URL
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: [url], applicationActivities: nil)
-    }
-
-    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
 /// One page of the carousel: the card itself, scaled to fit the page.
