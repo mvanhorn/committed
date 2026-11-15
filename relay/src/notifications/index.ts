@@ -4,6 +4,7 @@ import type { InstallationRow, Store } from "../db";
 import type { Log } from "../relay";
 import { notifyCloseCalls } from "./closeCalls";
 import { notifyPasses } from "./passes";
+import { notifyRecords } from "./records";
 import { parsePreferences, type NotificationPreferences } from "./preferences";
 import { parseState, type NotificationState } from "./state";
 
@@ -44,6 +45,7 @@ export async function runNotifications(
 
   state = await notifyPasses(context, state, (next) => saveState(row, next, deps), deps);
   state = await notifyCloseCalls(context, state, (next) => saveState(row, next, deps), deps);
+  state = await notifyRecords(context, state, (next) => saveState(row, next, deps), deps);
 }
 
 /** State is saved before anything is sent, so a failure mid-send can't send the same thing twice. */

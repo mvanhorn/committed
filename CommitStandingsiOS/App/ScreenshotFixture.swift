@@ -29,8 +29,9 @@ import UIKit
 /// the thousands beside the streaks, the board's widest rows), and
 /// `-LiveRankPayload <file.json>` shows a Live Activity push payload's content state in Live rank,
 /// `-ScreenshotNotifications` opens Settings ▸ Notifications (with `-ScreenshotTab settings`),
-/// `-ScreenshotPasses rivals`, `-ScreenshotCloseCalls` and `-ScreenshotQuietHours 23:30-07:00` (or `off`) set the board
-/// owner's notification choices, `-ScreenshotNotificationsDenied` reads iOS's permission as denied,
+/// `-ScreenshotPasses rivals`, `-ScreenshotCloseCalls`, `-ScreenshotRecords off` and `-ScreenshotQuietHours
+/// 23:30-07:00` (or `off`) set the board owner's notification choices, `-ScreenshotNotificationsDenied`
+/// reads iOS's permission as denied,
 /// `-ScreenshotNoRelay` runs a relay build as one without the relay,
 /// and `-RelayDisclosureAccepted` starts with the Committed relay disclosure already accepted (for
 /// builds with `COMMITTED_RELAY_URL`; without it, a relay build shows the disclosure sheet).
@@ -145,7 +146,8 @@ enum ScreenshotFixture {
     }
 
     /// The board owner's notification choices, in memory: the defaults, with `-ScreenshotPasses`,
-    /// `-ScreenshotCloseCalls` (Close calls on) and `-ScreenshotQuietHours <start>-<end>|off` applied.
+    /// `-ScreenshotCloseCalls` (Close calls on), `-ScreenshotRecords off` and
+    /// `-ScreenshotQuietHours <start>-<end>|off` applied.
     static func notificationPreferences() -> InMemoryNotificationPreferences {
         var choices = NotificationPreferences()
         if let passes = value(after: "-ScreenshotPasses").flatMap(NotificationPreferences.Passes.init(rawValue:)) {
@@ -153,6 +155,9 @@ enum ScreenshotFixture {
         }
         if ProcessInfo.processInfo.arguments.contains("-ScreenshotCloseCalls") {
             choices.closeCalls = true
+        }
+        if value(after: "-ScreenshotRecords") == "off" {
+            choices.records = false
         }
         if let hours = value(after: "-ScreenshotQuietHours") {
             let ends = hours.split(separator: "-").map(String.init)
