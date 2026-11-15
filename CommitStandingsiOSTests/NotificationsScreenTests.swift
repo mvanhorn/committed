@@ -210,6 +210,28 @@ struct NotificationsScreenTests {
         #expect(lastNotifications?.preferences.streakReminder == true)
     }
 
+    /// Delivery (#135): **Passes now, the rest at 9 PM** by default; **Right away** through the
+    /// screen's binding is saved for this account and sent as `delivery`.
+    @Test func theDeliveryChoiceIsSavedAndReachesTheRelay() async {
+        agreedToRelayNotifications()
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+        let delivery = model.notificationChoice(\.delivery)
+        #expect(delivery.wrappedValue == .summary)
+        #expect(lastNotifications?.preferences.delivery == .summary)
+
+        delivery.wrappedValue = .immediate
+        for _ in 0..<200 where lastNotifications?.preferences.delivery != .immediate { await Task.yield() }
+
+        #expect(delivery.wrappedValue == .immediate)
+        #expect(choices.load(account: "me").delivery == .immediate)
+        #expect(choices.load(account: "someone-else").delivery == .summary)
+        #expect(lastNotifications?.preferences.delivery == .immediate)
+        // Choosing how notifications arrive turns no kind on or off.
+        #expect(model.relayNotificationsOn)
+        #expect(model.notificationChoices.results)
+    }
+
     @Test func theSampleBoardSavesNoChoices() async {
         agreedToRelayNotifications()
         let model = makeModel(signedIn: false)
@@ -299,5 +321,34 @@ struct QuietHoursTimeTests {
         #expect(NotificationPreferences.QuietHours.time(from: date, calendar: calendar) == "23:30")
         let back = try #require(NotificationPreferences.QuietHours.date(for: "23:30", calendar: calendar))
         #expect(calendar.dateComponents([.hour, .minute], from: back) == DateComponents(hour: 23, minute: 30))
+    }
+}
+
+/// When the evening summary (#135) goes out, as relay/src/notifications/summary.ts decides it:
+/// 9 PM, or when quiet hours start if that's earlier in the afternoon or evening.
+struct EveningSummaryTimeTests {
+    private func summaryTime(quietHours: NotificationPreferences.QuietHours?) -> String {
+        var choices = NotificationPreferences()
+        choices.quietHours = quietHours
+        return choices.summaryTime
+    }
+
+    @Test func isNinePMByDefault() {
+        #expect(NotificationPreferences().summaryTime == "21:00")
+        #expect(summaryTime(quietHours: nil) == "21:00")
+    }
+
+    @Test func movesUpToQuietHoursStartingEarlierInTheEvening() {
+        #expect(summaryTime(quietHours: .init(start: "20:30", end: "07:00")) == "20:30")
+        #expect(summaryTime(quietHours: .init(start: "12:00", end: "13:00")) == "12:00")
+    }
+
+    @Test func staysAtNinePMOtherwise() {
+        #expect(summaryTime(quietHours: .init(start: "23:00", end: "07:00")) == "21:00")
+        #expect(summaryTime(quietHours: .init(start: "21:00", end: "07:00")) == "21:00")
+        #expect(summaryTime(quietHours: .init(start: "06:00", end: "11:00")) == "21:00")
+        #expect(summaryTime(quietHours: .init(start: "00:30", end: "07:00")) == "21:00")
+        // The same start and end is never quiet.
+        #expect(summaryTime(quietHours: .init(start: "20:00", end: "20:00")) == "21:00")
     }
 }

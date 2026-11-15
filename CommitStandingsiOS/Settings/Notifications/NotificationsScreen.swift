@@ -2,10 +2,10 @@ import SwiftUI
 
 /// Settings ▸ Notifications (#130): every notification choice in one place.
 ///
-/// One section view per group, in the spec's order. Later tickets each add their own section view
-/// at the marked place (Results #131, About you #133/#134, Delivery #135), or one row in
-/// `AboutYourRivalsSection` (Close calls #132), and bind it with `model.notificationChoice(_:)`,
-/// which saves the choice for this account and updates the relay registration right away.
+/// One section view per group, in the spec's order (About your rivals, Results #131, About you
+/// #133/#134, Delivery #135, Quiet hours); Close calls (#132) is a row in `AboutYourRivalsSection`.
+/// Each row binds with `model.notificationChoice(_:)`, which saves the choice for this account and
+/// updates the relay registration right away.
 ///
 /// The gate (`AppModel.relayNotificationsOn`): relay notifications are on with relay consent, iOS
 /// permission, and any kind on; Passes off sends `passes: "off"`, and only every kind off sends
@@ -28,7 +28,7 @@ struct NotificationsScreen: View {
                 if model.showsRelayNotificationChoices {
                     ResultsSection()
                     AboutYouSection()
-                    // Delivery (#135) goes here.
+                    DeliverySection()
                     QuietHoursSection()
                 }
             }
@@ -36,6 +36,9 @@ struct NotificationsScreen: View {
             .listRowSeparatorTint(.hairline)
         }
         .listSectionSpacing(28)
+        #if DEBUG
+        .defaultScrollAnchor(ScreenshotFixture.notificationsScrolledToEnd ? .bottom : nil)
+        #endif
         .inkScreen()
         .readableContentWidth()
         .navigationTitle("Notifications")

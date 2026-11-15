@@ -92,6 +92,16 @@ extension NotificationPreferences {
         for kind in Self.kindSwitches { self[keyPath: kind] = false }
     }
 
+    /// When the evening summary (#135) goes out, as "HH:MM": 9 PM, or when quiet hours start if
+    /// that's earlier in the afternoon or evening (from noon). The relay decides it the same way
+    /// (`summaryMinutes` in relay/src/notifications/summary.ts).
+    var summaryTime: String {
+        let nine = "21:00"
+        guard let quietHours, quietHours.start != quietHours.end,
+              let start = QuietHours.hourAndMinute(quietHours.start) else { return nine }
+        return (12..<21).contains(start.hour) ? quietHours.start : nine
+    }
+
     /// The spec defaults that turning on the first switch brings (passes for everyone, results and
     /// records on, close calls and the streak reminder off, delivery summary, quiet hours 10 PM to
     /// 8 AM), keeping the Window already chosen, which isn't a kind of notification.

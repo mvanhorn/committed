@@ -506,6 +506,21 @@ struct RelayNotificationsTests {
         #expect(DeepLink(notification: ["kind": "something-new"]) == nil)
     }
 
+    /// The evening summary (#135), "Your day so far", opens the Board.
+    @Test func aTappedEveningSummaryOpensTheBoard() async {
+        let (model, _) = makeModel()
+        await model.sceneDidBecomeActive()
+        model.selectedTab = .settings
+
+        let link = DeepLink(notification: ["kind": "summary", "aps": ["thread-id": "summary"]])
+        #expect(link == .board(window: nil))
+        model.open(link!)
+
+        #expect(model.selectedTab == .board)
+        #expect(model.selectedPerson == nil)
+        #expect(DeepLink(notification: ["kind": "summary"], action: "com.apple.UNNotificationDismissActionIdentifier") == nil)
+    }
+
     /// A record notification (#134) carries your own login: tapping it opens your own view.
     @Test func aTappedRecordOpensYourOwnView() async {
         let (model, _) = makeModel()

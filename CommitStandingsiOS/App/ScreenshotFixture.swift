@@ -28,10 +28,11 @@ import UIKit
 /// `-ScreenshotCountScale <n>` multiplies everyone's counts by n (30 puts every 30-day count in
 /// the thousands beside the streaks, the board's widest rows), and
 /// `-LiveRankPayload <file.json>` shows a Live Activity push payload's content state in Live rank,
-/// `-ScreenshotNotifications` opens Settings ▸ Notifications (with `-ScreenshotTab settings`),
+/// `-ScreenshotNotifications` opens Settings ▸ Notifications (with `-ScreenshotTab settings`;
+/// `-ScreenshotNotificationsEnd` opens it scrolled to its end),
 /// `-ScreenshotPasses rivals`, `-ScreenshotCloseCalls`, `-ScreenshotResults off`, `-ScreenshotRecords off`,
-/// `-ScreenshotStreakReminder` and `-ScreenshotQuietHours 23:30-07:00` (or `off`) set the board owner's
-/// notification choices,
+/// `-ScreenshotStreakReminder`, `-ScreenshotDelivery immediate` and `-ScreenshotQuietHours 23:30-07:00`
+/// (or `off`) set the board owner's notification choices,
 /// `-ScreenshotNotificationsDenied` reads iOS's permission as denied,
 /// `-ScreenshotNoRelay` runs a relay build as one without the relay,
 /// and `-RelayDisclosureAccepted` starts with the Committed relay disclosure already accepted (for
@@ -77,12 +78,15 @@ enum ScreenshotFixture {
     /// through the notification delegate's own route (`ForegroundNotificationPresenter.receive`).
     /// No notification is shown or tapped. `-ScreenshotNotificationKind closeCall` makes it a relay
     /// close call (#132) instead, which has no category; `streakReminder` a streak reminder (#133),
-    /// whose login is your own.
+    /// whose login is your own; `summary` the evening summary (#135), which names no one (the login
+    /// is ignored).
     static var notificationResponse: DeepLink? {
         guard let raw = value(after: "-ScreenshotNotificationResponse"),
               let colon = raw.lastIndex(of: ":") else { return nil }
         let action = String(raw[..<colon]), login = String(raw[raw.index(after: colon)...])
-        if let kind = value(after: "-ScreenshotNotificationKind"), ["closeCall", "streakReminder"].contains(kind) {
+        let kind = value(after: "-ScreenshotNotificationKind")
+        if kind == "summary" { return DeepLink(notification: ["kind": "summary"], action: action) }
+        if let kind, ["closeCall", "streakReminder"].contains(kind) {
             return DeepLink(notification: ["kind": kind, "login": login], action: action)
         }
         return DeepLink(notification: ["kind": "pass", "login": login, "aps": ["category": DeepLink.passCategory]],
@@ -137,6 +141,12 @@ enum ScreenshotFixture {
         ProcessInfo.processInfo.arguments.contains("-ScreenshotNotifications")
     }
 
+    /// `-ScreenshotNotificationsEnd`: the Notifications screen opens scrolled to its end (Delivery
+    /// and Quiet hours), for captures of sections below the fold.
+    static var notificationsScrolledToEnd: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotNotificationsEnd")
+    }
+
     /// `-ScreenshotNotificationsDenied`: iOS's notification permission reads as denied.
     static var notificationsDenied: Bool {
         ProcessInfo.processInfo.arguments.contains("-ScreenshotNotificationsDenied")
@@ -149,7 +159,8 @@ enum ScreenshotFixture {
 
     /// The board owner's notification choices, in memory: the defaults, with `-ScreenshotPasses`,
     /// `-ScreenshotCloseCalls` (Close calls on), `-ScreenshotResults off`, `-ScreenshotRecords off`,
-    /// `-ScreenshotStreakReminder` (Streak reminder on) and `-ScreenshotQuietHours <start>-<end>|off` applied.
+    /// `-ScreenshotStreakReminder` (Streak reminder on), `-ScreenshotDelivery immediate|summary` and
+    /// `-ScreenshotQuietHours <start>-<end>|off` applied.
     static func notificationPreferences() -> InMemoryNotificationPreferences {
         var choices = NotificationPreferences()
         if let passes = value(after: "-ScreenshotPasses").flatMap(NotificationPreferences.Passes.init(rawValue:)) {
@@ -169,6 +180,9 @@ enum ScreenshotFixture {
             choices.quietHours = ends.count == 2 ? .init(start: ends[0], end: ends[1]) : nil
         }
         if value(after: "-ScreenshotResults") == "off" { choices.results = false }
+        if let delivery = value(after: "-ScreenshotDelivery").flatMap(NotificationPreferences.Delivery.init(rawValue:)) {
+            choices.delivery = delivery
+        }
         return InMemoryNotificationPreferences([SampleServices.owner: choices])
     }
 
