@@ -21,7 +21,7 @@ struct RelayNotificationsTests {
     }
 
     private func makeModel(
-        signedIn: Bool = true, notificationsOn: Bool = false, saved: [Competitor] = []
+        signedIn: Bool = true, notificationsOn: Bool = false, saved: [Competitor] = [], permission: Bool = true
     ) -> (AppModel, FakeContributions) {
         defaults.set(notificationsOn, forKey: NotificationService.enabledDefaultsKey)
         let session: URLSession = {
@@ -38,7 +38,7 @@ struct RelayNotificationsTests {
             store: StandingsStore(persistence: people),
             credentials: InMemoryGitHubCredentialStore(token: signedIn ? "gho_test" : nil),
             contributions: contributions,
-            notifications: NotificationService(defaults: defaults, authorize: { true }, sink: { posted.events += $0 }),
+            notifications: NotificationService(defaults: defaults, authorize: { permission }, sink: { posted.events += $0 }),
             gitHubAuth: GitHubAuth(clientID: "test", session: session, sleep: { _ in }, now: { clock.now }),
             accountFactory: { GitHubAccountClient(token: $0, session: session) },
             fetchRoster: { _ in
@@ -236,6 +236,224 @@ struct RelayNotificationsTests {
         await model.pullToRefresh()
 
         #expect(posted.events.map(\.rivalUsername) == ["bo"])
+    }
+
+    // MARK: The "any switch" gate
+
+    /// Relay notifications agreed to, Live rank off.
+    private func agreedToRelayNotifications() {
+        preferences.save(LiveRankPreferences(isEnabled: false, relayDisclosureAccepted: true, relayNotifications: true))
+    }
+
+    private func savedChoices(_ change: (inout NotificationPreferences) -> Void) -> NotificationPreferences {
+        var saved = NotificationPreferences()
+        change(&saved)
+        choices.save(saved, account: "me")
+        return saved
+    }
+
+    @Test func agreeingIsNotTurningAnythingOn() async {
+        // The relay sheet accepted, no switch ever turned on: the saved defaults (results and
+        // records on) don't turn relay notifications on by themselves.
+        agreedToRelayNotifications()
+        let (model, _) = makeModel()
+        await model.sceneDidBecomeActive()
+
+        #expect(!model.relayNotificationsOn)
+        #expect(lastNotifications == .some(nil))
+        #expect(!model.passesOn)
+        #expect(!model.notificationChoices.results)
+        #expect(!model.notificationChoices.records)
+        #expect(model.notificationChoices.passes == .off)
+    }
+
+    @Test func theFirstSwitchOnBringsTheDefaultsWithThatSwitchOn() async {
+        agreedToRelayNotifications()
+        _ = savedChoices {
+            $0.window = .weekly
+            $0.results = false
+            $0.delivery = .immediate
+            $0.quietHours = nil
+        }
+        let (model, _) = makeModel()
+        await model.sceneDidBecomeActive()
+
+        await model.setNotificationChoice(\.closeCalls, true)
+
+        // The spec defaults (passes everyone, results and records on, delivery summary, quiet
+        // hours 22–08) with Close calls on; the Window chosen before stays.
+        var expected = NotificationPreferences()
+        expected.window = .weekly
+        expected.closeCalls = true
+        #expect(choices.load(account: "me") == expected)
+        #expect(model.notificationChoices == expected)
+        #expect(model.passesOn)
+        #expect(model.relayNotificationsOn)
+        #expect(lastNotifications == .some(RelayNotificationsConfiguration(preferences: expected)))
+    }
+
+    @Test func turningOnAKindLaterTurnsOnOnlyThatKind() async {
+        agreedToRelayNotifications()
+        _ = savedChoices {
+            $0.passes = .off
+            $0.results = false
+            $0.records = false
+        }
+        let (model, _) = makeModel(notificationsOn: true)
+        await model.sceneDidBecomeActive()
+        #expect(lastNotifications == .some(nil)) // every kind off
+
+        await model.setNotificationChoice(\.records, true)
+
+        #expect(choices.load(account: "me").records)
+        #expect(choices.load(account: "me").passes == .off)
+        #expect(!choices.load(account: "me").results)
+        #expect(lastNotifications??.preferences.records == true)
+        #expect(lastNotifications??.preferences.passes == .off)
+    }
+
+    @Test func passesOffSendsPassesOffWhileAnotherKindIsOn() async {
+        agreedToRelayNotifications()
+        let (model, _) = makeModel(notificationsOn: true)
+        await model.sceneDidBecomeActive()
+
+        await model.leaderboardNotificationsChanged(false)
+
+        #expect(!model.passesOn)
+        #expect(model.relayNotificationsOn)
+        #expect(lastNotifications??.preferences.passes == .off)
+        #expect(lastNotifications??.preferences.results == true)
+
+        await model.setNotificationChoice(\.results, false)
+        await model.setNotificationChoice(\.records, false)
+
+        // Every kind off: only now is the relay told notifications are off.
+        #expect(!model.relayNotificationsOn)
+        #expect(lastNotifications == .some(nil))
+
+        // Passes back on, after opting in: only Passes, as Everyone.
+        await model.leaderboardNotificationsChanged(true)
+        #expect(model.passesOn)
+        #expect(lastNotifications??.preferences.passes == .everyone)
+        #expect(lastNotifications??.preferences.results == false)
+    }
+
+    @Test func deniedPermissionChangesNothing() async {
+        agreedToRelayNotifications()
+        let (model, _) = makeModel(permission: false)
+        await model.sceneDidBecomeActive()
+
+        await model.setNotificationChoice(\.results, true)
+
+        #expect(!model.services.notifications.isEnabled)
+        #expect(!model.notificationChoices.results)
+        #expect(!model.relayNotificationsOn)
+        #expect(relay.notifications.compactMap { $0 }.isEmpty)
+    }
+
+    @Test func anotherSwitchAsksForRelayConsentToo() async {
+        acceptedEarlierSheet()
+        let (model, _) = makeModel()
+        await model.sceneDidBecomeActive()
+
+        await model.setNotificationChoice(\.streakReminder, true)
+        #expect(model.isShowingRelayNotificationsConsent)
+        #expect(lastNotifications == .some(nil)) // not before Turn On
+
+        await model.acceptRelayNotifications()
+        var expected = NotificationPreferences()
+        expected.streakReminder = true
+        #expect(model.relayNotificationsOn)
+        #expect(choices.load(account: "me") == expected)
+        #expect(lastNotifications == .some(RelayNotificationsConfiguration(preferences: expected)))
+    }
+
+    @Test func notNowAfterAnotherSwitchLeavesEverythingAsBefore() async {
+        acceptedEarlierSheet()
+        let (model, _) = makeModel()
+        await model.sceneDidBecomeActive()
+
+        await model.setNotificationChoice(\.results, true)
+        await model.declineRelayNotifications()
+
+        #expect(!model.services.notifications.isEnabled) // no in-app passes either
+        #expect(choices.load(account: "me") == NotificationPreferences())
+        #expect(!model.relayNotificationsOn)
+        #expect(relay.notifications.compactMap { $0 }.isEmpty)
+    }
+
+    @Test func dismissingTheSheetForgetsTheSwitch() async {
+        acceptedEarlierSheet()
+        let (model, _) = makeModel()
+        await model.sceneDidBecomeActive()
+        await model.setNotificationChoice(\.closeCalls, true)
+
+        model.isShowingRelayNotificationsConsent = false
+        // A later Turn On (for example from the Live rank sheet) doesn't apply the old tap.
+        await model.acceptRelayNotifications()
+
+        #expect(!choices.load(account: "me").closeCalls)
+        #expect(!model.relayNotificationsOn)
+    }
+
+    @Test func aColdLaunchNeverTellsTheRelayNotificationsAreOff() async {
+        agreedToRelayNotifications()
+        let saved = savedChoices {
+            $0.passes = .off
+            $0.results = false
+        }
+        // The owner isn't known until the first refresh.
+        let (model, _) = makeModel(notificationsOn: true)
+        await model.sceneDidBecomeActive()
+        await model.backgroundRefresh()
+
+        #expect(!relay.notifications.contains(.some(nil)))
+        #expect(lastNotifications == .some(RelayNotificationsConfiguration(preferences: saved)))
+    }
+
+    @Test func passesOffPostsNoLocalPassesWhileAnotherKindIsOn() async {
+        agreedToRelayNotifications()
+        _ = savedChoices { $0.passes = .off }
+        relay.deliversNotifications = false // not registered yet
+        let (model, contributions) = makeModel(notificationsOn: true)
+        await model.sceneDidBecomeActive()
+
+        await contributions.set("bo", 9)
+        clock.advance(300)
+        await model.pullToRefresh()
+
+        #expect(posted.events.isEmpty)
+    }
+
+    @Test func everyKindOffPostsNoLocalPasses() async {
+        agreedToRelayNotifications()
+        _ = savedChoices {
+            $0.passes = .off
+            $0.results = false
+            $0.records = false
+        }
+        let (model, contributions) = makeModel(notificationsOn: true)
+        await model.sceneDidBecomeActive()
+
+        await contributions.set("bo", 9)
+        clock.advance(300)
+        await model.pullToRefresh()
+
+        #expect(posted.events.isEmpty)
+    }
+
+    @Test func theSettingsRowFollowsTheGate() async {
+        agreedToRelayNotifications()
+        let (model, _) = makeModel(notificationsOn: true)
+        await model.sceneDidBecomeActive()
+        #expect(model.notificationsOn)
+
+        await model.leaderboardNotificationsChanged(false)
+        #expect(model.notificationsOn) // results and records still on
+
+        await model.setNotificationChoice(\.results, false)
+        await model.setNotificationChoice(\.records, false)
+        #expect(!model.notificationsOn)
     }
 
     // MARK: Taps

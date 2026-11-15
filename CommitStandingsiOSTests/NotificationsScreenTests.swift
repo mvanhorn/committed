@@ -129,9 +129,9 @@ struct NotificationsScreenTests {
         #expect(lastNotifications?.preferences.quietHours == .init(start: "22:00", end: "08:00"))
     }
 
-    /// Today's gate (see `NotificationsScreen`): relay notifications follow the Passes switch, so a
-    /// choice made with Passes off is saved but the relay hears notifications off.
-    @Test func withPassesOffTheRelayHearsNotificationsOff() async {
+    /// Before any switch is turned on (no permission asked yet), a choice such as the Window is
+    /// saved, but it turns nothing on: the relay hears notifications off.
+    @Test func aChoiceBeforeAnySwitchIsOnTurnsNothingOn() async {
         agreedToRelayNotifications()
         let model = makeModel(notificationsOn: false)
         await model.sceneDidBecomeActive()

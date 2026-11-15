@@ -3,21 +3,22 @@ import SwiftUI
 /// About your rivals: **Passes** (a notification when someone passes you or you pass them), who
 /// they cover (**Everyone** or **Pinned rivals**), and the **Window** they're judged on.
 ///
-/// The Passes switch is the one Leaderboard Notifications was: turning it on shows the iOS
-/// permission prompt (and switches back off if it's denied), and in a relay build asks about relay
-/// notifications. Without the relay choices (no relay, the Sample board, or Not Now) it's alone.
+/// The Passes switch is the one Leaderboard Notifications was. Turning it on takes the step every
+/// switch takes (the iOS permission prompt, switching back off if it's denied, then relay consent in
+/// a relay build); off, with the relay's choices, it sends `passes: "off"` and leaves the other
+/// kinds on. Without the relay choices (no relay, the Sample board, or Not Now) it's alone.
 struct AboutYourRivalsSection: View {
     @Environment(AppModel.self) private var model
-    @AppStorage(NotificationService.enabledDefaultsKey) private var passesOn = false
+    /// Shows the switch on while iOS's prompt is up, as it did before.
     @State private var requestingAuthorization = false
 
     var body: some View {
         let showsChoices = model.showsRelayNotificationChoices
+        let passesOn = model.passesOn || requestingAuthorization
         Section {
             Toggle("Passes", isOn: Binding(
                 get: { passesOn },
                 set: { enabled in
-                    passesOn = enabled
                     guard enabled else {
                         Task { await model.leaderboardNotificationsChanged(false) }
                         return
@@ -30,9 +31,9 @@ struct AboutYourRivalsSection: View {
                     }
                 }
             ))
-            .disabled(requestingAuthorization)
+            .disabled(requestingAuthorization || model.isTurningOnNotifications)
             if showsChoices {
-                if passesOn {
+                if model.passesOn {
                     Picker("People", selection: model.notificationChoice(\.passes)) {
                         Text("Everyone").tag(NotificationPreferences.Passes.everyone)
                         Text("Pinned rivals").tag(NotificationPreferences.Passes.rivals)
@@ -48,11 +49,11 @@ struct AboutYourRivalsSection: View {
         } header: {
             FolioHeader("About your rivals")
         } footer: {
-            Text(footer(showsChoices: showsChoices))
+            Text(footer(showsChoices: showsChoices, passesOn: passesOn))
         }
     }
 
-    private func footer(showsChoices: Bool) -> String {
+    private func footer(showsChoices: Bool, passesOn: Bool) -> String {
         guard passesOn else { return "Turn on to hear when someone passes you or you pass them." }
         guard showsChoices else { return "When someone passes you or you pass them, while Committed is open." }
         let window = model.notificationChoices.window.shortTitle

@@ -28,8 +28,9 @@ final class NotificationService: RankChangeNotifying {
     /// Replaces the notification center in tests: receives what would be posted. `nil` posts.
     private let sink: (@MainActor ([RankChangeEvent]) -> Void)?
 
-    /// iPhone: true while the Committed relay delivers crossings as relay notifications, so a pass
-    /// never arrives twice. The app stops posting its own until the relay stops. The Mac leaves it.
+    /// iPhone: true while the app's own crossing notifications give way to relay notifications: the
+    /// relay delivers them (so a pass never arrives twice), or relay notifications have Passes off.
+    /// The app posts none of its own until it's false again. The Mac leaves it.
     @ObservationIgnored var isDeliveredByRelay: @MainActor () -> Bool = { false }
 
     init(
@@ -65,6 +66,12 @@ final class NotificationService: RankChangeNotifying {
         guard isEnabled else { return false }
         if !granted { defaults.set(false, forKey: Self.enabledDefaultsKey) }
         return granted
+    }
+
+    /// iPhone: switches on without asking, once iOS's permission is already granted (the
+    /// Notifications screen's shared step asks first, then waits for relay consent).
+    func markEnabled() {
+        defaults.set(true, forKey: Self.enabledDefaultsKey)
     }
 
     func post(_ events: [RankChangeEvent]) {

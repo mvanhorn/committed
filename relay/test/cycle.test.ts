@@ -720,6 +720,49 @@ describe("relay notifications: passes", () => {
     expect(apns.alerts).toHaveLength(0);
   });
 
+  // The iPhone's "any switch" gate: Passes off with another kind on sends `passes: "off"`, which
+  // skips passes only. The installation, its alert token and every other kind's state stay.
+  it("with passes off and another kind on, skips passes and keeps everything else", async () => {
+    await registerNotifications();
+    await relay.runCycle();
+    expect(JSON.parse(String((await storedRow())!.notification_state))).toHaveProperty("passes");
+    // Another kind's state, as a later kind (results, close calls, …) leaves it.
+    const theirs = { sent: "2026-11-04" };
+    const state = { ...JSON.parse(String((await storedRow())!.notification_state)), results: theirs };
+    await env.DB.prepare("UPDATE installations SET notification_state = ? WHERE id = ?")
+      .bind(JSON.stringify(state), ID).run();
+
+    await registerNotifications({ notifications: { window: "daily", passes: "off", results: true } });
+    github.set("alice", { "2026-11-05": 7 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+
+    expect(apns.alerts).toHaveLength(0);
+    const row = (await storedRow())!;
+    expect(row.alert_token).toBe(ALERT);
+    expect(JSON.parse(String(row.notifications_json))).toMatchObject({ passes: "off", results: true });
+    expect(JSON.parse(String(row.notification_state))).toEqual({ results: theirs });
+  });
+
+  it("with passes back on, takes a fresh baseline instead of replaying what passed while off", async () => {
+    await registerNotifications();
+    await relay.runCycle();
+    await registerNotifications({ notifications: { window: "daily", passes: "off", results: true } });
+    github.set("alice", { "2026-11-05": 7 }); // passes you while Passes is off
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+
+    await registerNotifications();
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(0);
+
+    github.set("me", { "2026-11-05": 8 }); // a real pass after Passes is back on
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts.map((alert) => alert.payload.aps.alert.title)).toEqual(["🎉 You passed alice!"]);
+  });
+
   it("never touches a Live Activity with Live rank off", async () => {
     await registerNotifications();
     // Even with tokens left behind in the row, nothing starts, updates or rotates.

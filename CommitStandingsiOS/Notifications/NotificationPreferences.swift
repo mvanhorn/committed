@@ -74,6 +74,34 @@ struct NotificationPreferences: Codable, Equatable, Sendable {
     }
 }
 
+/// The "any switch" gate (#130): the kinds of notification, and the choices on first opt-in.
+extension NotificationPreferences {
+    /// Each kind's switch besides Passes.
+    static let kindSwitches: [WritableKeyPath<NotificationPreferences, Bool>] = [
+        \.closeCalls, \.results, \.records, \.streakReminder,
+    ]
+
+    /// At least one kind of notification is on: relay notifications are on only then.
+    var anyKindOn: Bool {
+        passes != .off || Self.kindSwitches.contains { self[keyPath: $0] }
+    }
+
+    /// Every kind off (Passes too), as the switches read before any is turned on.
+    mutating func turnEveryKindOff() {
+        passes = .off
+        for kind in Self.kindSwitches { self[keyPath: kind] = false }
+    }
+
+    /// The spec defaults that turning on the first switch brings (passes for everyone, results and
+    /// records on, close calls and the streak reminder off, delivery summary, quiet hours 10 PM to
+    /// 8 AM), keeping the Window already chosen, which isn't a kind of notification.
+    var turnedOnDefaults: NotificationPreferences {
+        var defaults = NotificationPreferences()
+        defaults.window = window
+        return defaults
+    }
+}
+
 /// Notification choices per GitHub account (the board owner's login).
 @MainActor
 protocol NotificationPreferencesStoring: AnyObject {
