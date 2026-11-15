@@ -129,6 +129,19 @@ struct NotificationsScreenTests {
         #expect(lastNotifications?.preferences.quietHours == .init(start: "22:00", end: "08:00"))
     }
 
+    @Test func closeCallsStartOffAndTurningThemOnIsSavedAndReachesTheRelay() async {
+        agreedToRelayNotifications()
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+        #expect(model.notificationChoices.closeCalls == false)
+
+        await model.updateNotificationChoices { $0.closeCalls = true }
+
+        #expect(model.notificationChoices.closeCalls)
+        #expect(choices.load(account: "me").closeCalls)
+        #expect(lastNotifications?.preferences.closeCalls == true)
+    }
+
     /// Before any switch is turned on (no permission asked yet), a choice such as the Window is
     /// saved, but it turns nothing on: the relay hears notifications off.
     @Test func aChoiceBeforeAnySwitchIsOnTurnsNothingOn() async {

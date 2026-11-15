@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// About your rivals: **Passes** (a notification when someone passes you or you pass them), who
-/// they cover (**Everyone** or **Pinned rivals**), and the **Window** they're judged on.
+/// they cover (**Everyone** or **Pinned rivals**), **Close calls** (a few contributions behind a
+/// pinned rival, or the person just above you), and the **Window** both are judged on.
 ///
 /// The Passes switch is the one Leaderboard Notifications was. Turning it on takes the step every
 /// switch takes (the iOS permission prompt, switching back off if it's denied, then relay consent in
@@ -39,7 +40,10 @@ struct AboutYourRivalsSection: View {
                         Text("Pinned rivals").tag(NotificationPreferences.Passes.rivals)
                     }
                 }
-                // Close calls (#132) go here, between People and Window.
+                Toggle(isOn: model.notificationChoice(\.closeCalls)) {
+                    Text("Close calls")
+                    Text(closeCallsDetail)
+                }
                 Picker("Window", selection: model.notificationChoice(\.window)) {
                     ForEach(ContributionWindow.allCases) { window in
                         Text(window.shortTitle).tag(window)
@@ -51,6 +55,13 @@ struct AboutYourRivalsSection: View {
         } footer: {
             Text(footer(showsChoices: showsChoices, passesOn: passesOn))
         }
+    }
+
+    /// Close calls (#132) are about your pinned rivals, or the person just above you when none are.
+    private var closeCallsDetail: String {
+        let rivals = model.store.pinnedRivals.map(\.username)
+        guard !rivals.isEmpty else { return "When you're a few contributions behind the person just above you." }
+        return "When you're a few contributions behind \(rivals.formatted(.list(type: .or)))."
     }
 
     private func footer(showsChoices: Bool, passesOn: Bool) -> String {
