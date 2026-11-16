@@ -1,4 +1,4 @@
-import { competitorsOf, standingsFor } from "../board";
+import { competitorsOf, rivalsOf, standingsFor } from "../board";
 import { localDate } from "../parser";
 import { order, type Window } from "../ranking";
 import { sendAlert } from "./alerts";
@@ -89,7 +89,7 @@ export async function notifyCloseCalls(
   for (const [login, standing] of Object.entries(standingsFor(competitors, data, preferences.window, today))) {
     counts[login] = standing.contributions;
   }
-  const rivals = (JSON.parse(row.rivals_json) as string[]).filter((login) => competitors.includes(login));
+  const rivals = rivalsOf(row);
   const last = state.closeCalls;
   const alreadySent = last?.date === today ? last.sent : [];
   const found = findCloseCalls(competitors, counts, row.login, preferences.window, rivals).filter(

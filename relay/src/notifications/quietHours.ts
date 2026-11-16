@@ -15,8 +15,8 @@ export function isQuietHours(
   quietHours: NotificationPreferences["quietHours"],
 ): boolean {
   if (!quietHours) return false;
-  const start = minutes(quietHours.start);
-  const end = minutes(quietHours.end);
+  const start = timeMinutes(quietHours.start);
+  const end = timeMinutes(quietHours.end);
   if (start === end) return false;
   const now = localMinutes(unixSeconds, timeZone);
   return start < end ? now >= start && now < end : now >= start || now < end;
@@ -36,7 +36,14 @@ export function localMinutes(unixSeconds: number, timeZone: string): number {
 }
 
 /** "HH:MM" → minutes since midnight. */
-function minutes(time: string): number {
+export function timeMinutes(time: string): number {
   const [hours = 0, mins = 0] = time.split(":").map(Number);
   return hours * 60 + mins;
 }
+
+/**
+ * Noon, in minutes since midnight: the earliest quiet hours can move an evening send up to (the
+ * streak reminder an hour before they start, the summary to their start). Quiet hours starting in
+ * the morning, or just after midnight, leave those at their usual evening time.
+ */
+export const EARLIEST_MINUTES = 12 * 60;

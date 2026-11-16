@@ -1,10 +1,10 @@
 import { competitorsOf, standingsFor } from "../board";
 import { localDate } from "../parser";
-import { addDays, order, type Window } from "../ranking";
+import { addDays, mondayOf, order, type Window } from "../ranking";
 import { sendAlert } from "./alerts";
 import type { NotificationContext, NotificationDeps } from "./index";
 import type { NotificationPreferences } from "./preferences";
-import { isQuietHours, localMinutes } from "./quietHours";
+import { isQuietHours, localMinutes, timeMinutes } from "./quietHours";
 import type { NotificationState } from "./state";
 
 /**
@@ -28,17 +28,11 @@ export interface FixedWeek {
  */
 export function fixedWeeks(unixSeconds: number, timeZone: string): { thisWeek: FixedWeek; lastWeek: FixedWeek } {
   const today = localDate(unixSeconds, timeZone);
-  const monday = addDays(today, -daysSinceMonday(today));
+  const monday = mondayOf(today);
   return {
     thisWeek: { first: monday, last: addDays(monday, 6) },
     lastWeek: { first: addDays(monday, -7), last: addDays(monday, -1) },
   };
-}
-
-/** 0 on a Monday through 6 on a Sunday, for a civil day key. */
-function daysSinceMonday(day: string): number {
-  const [year, month, date] = day.split("-").map(Number);
-  return (new Date(Date.UTC(year!, month! - 1, date!)).getUTCDay() + 6) % 7;
 }
 
 /** `notification_state.results`: the last local date whose morning results were settled (sent or skipped). */
@@ -103,9 +97,7 @@ function trail({ mine, other }: Finish): string {
 
 /** Minutes after local midnight results go out: when quiet hours end, or 8 AM without them. */
 function sendMinutes(quietHours: NotificationPreferences["quietHours"]): number {
-  const time = quietHours && quietHours.start !== quietHours.end ? quietHours.end : "08:00";
-  const [hours = 0, minutes = 0] = time.split(":").map(Number);
-  return hours * 60 + minutes;
+  return timeMinutes(quietHours && quietHours.start !== quietHours.end ? quietHours.end : "08:00");
 }
 
 function readState(raw: unknown): string | null {

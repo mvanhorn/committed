@@ -4,7 +4,7 @@ import { currentStreak, localDate, sum } from "../parser";
 import { sendAlert } from "./alerts";
 import type { NotificationContext, NotificationDeps } from "./index";
 import type { NotificationPreferences } from "./preferences";
-import { isQuietHours, localMinutes } from "./quietHours";
+import { EARLIEST_MINUTES, isQuietHours, localMinutes, timeMinutes } from "./quietHours";
 import type { NotificationState } from "./state";
 import { holdStreakReminder, holdsForSummary } from "./summary";
 
@@ -34,8 +34,6 @@ export interface StreakReminder {
 
 /** 8 PM, in minutes since local midnight. */
 export const REMINDER_MINUTES = 20 * 60;
-/** The hour before quiet hours counts only when it falls in the afternoon or evening. */
-const EARLIEST_MINUTES = 12 * 60;
 
 /**
  * When today's reminder is due, in minutes since local midnight: 8 PM, or an hour before quiet
@@ -45,8 +43,7 @@ const EARLIEST_MINUTES = 12 * 60;
  */
 export function reminderMinutes(quietHours: NotificationPreferences["quietHours"]): number {
   if (!quietHours || quietHours.start === quietHours.end) return REMINDER_MINUTES;
-  const [hours = 0, minutes = 0] = quietHours.start.split(":").map(Number);
-  const beforeQuiet = hours * 60 + minutes - 60;
+  const beforeQuiet = timeMinutes(quietHours.start) - 60;
   return beforeQuiet >= EARLIEST_MINUTES && beforeQuiet < REMINDER_MINUTES ? beforeQuiet : REMINDER_MINUTES;
 }
 

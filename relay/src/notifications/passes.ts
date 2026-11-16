@@ -1,4 +1,4 @@
-import { competitorsOf, standingsFor } from "../board";
+import { competitorsOf, rivalsOf, standingsFor } from "../board";
 import { localDate } from "../parser";
 import { sendAlert } from "./alerts";
 import type { NotificationContext, NotificationDeps } from "./index";
@@ -99,7 +99,7 @@ export async function notifyPasses(
 
   const last = state.passes;
   const comparable = last && last.window === preferences.window && last.date === today ? last.counts : null;
-  const rivals = preferences.passes === "rivals" ? new Set(JSON.parse(row.rivals_json) as string[]) : null;
+  const rivals = preferences.passes === "rivals" ? new Set(rivalsOf(row)) : null;
   const events = crossings(comparable, counts, row.login).filter((event) => !rivals || rivals.has(event.rival));
   const quiet = isQuietHours(now, row.time_zone, preferences.quietHours);
   const passes: PassesState = { window: preferences.window, date: today, counts };

@@ -4,8 +4,9 @@ import { sendAlert } from "./alerts";
 import { closeCallMargin, type CloseCall } from "./closeCalls";
 import type { NotificationContext, NotificationDeps } from "./index";
 import type { NotificationPreferences } from "./preferences";
-import { isQuietHours, localMinutes } from "./quietHours";
-import { isStillDue, latestRecord, mondayOf, type DueRecord } from "./records";
+import { EARLIEST_MINUTES, isQuietHours, localMinutes, timeMinutes } from "./quietHours";
+import { mondayOf } from "../ranking";
+import { isStillDue, latestRecord, type DueRecord } from "./records";
 import { finish } from "./results";
 import type { NotificationState } from "./state";
 import type { StreakReminder } from "./streakReminder";
@@ -48,8 +49,6 @@ export interface SummaryState {
 
 /** 9 PM, in minutes since local midnight. */
 export const SUMMARY_MINUTES = 21 * 60;
-/** Quiet hours that start before noon (or after midnight) don't move the summary. */
-const EARLIEST_MINUTES = 12 * 60;
 
 export const SUMMARY_TITLE = "Your day so far";
 
@@ -59,8 +58,7 @@ export const SUMMARY_TITLE = "Your day so far";
  */
 export function summaryMinutes(quietHours: NotificationPreferences["quietHours"]): number {
   if (!quietHours || quietHours.start === quietHours.end) return SUMMARY_MINUTES;
-  const [hours = 0, minutes = 0] = quietHours.start.split(":").map(Number);
-  const start = hours * 60 + minutes;
+  const start = timeMinutes(quietHours.start);
   return start >= EARLIEST_MINUTES && start < SUMMARY_MINUTES ? start : SUMMARY_MINUTES;
 }
 

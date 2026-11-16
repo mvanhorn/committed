@@ -1,6 +1,6 @@
 import type { InstallationRow } from "../db";
 import { localDate, type Days } from "../parser";
-import { addDays } from "../ranking";
+import { addDays, mondayOf } from "../ranking";
 import { sendAlert } from "./alerts";
 import type { NotificationContext, NotificationDeps } from "./index";
 import { isQuietHours } from "./quietHours";
@@ -55,13 +55,6 @@ export interface Records {
 
 /** The smallest old best a record notification (or the app's card) celebrates. */
 export const MINIMUM_OLD_BEST: Record<RecordKind, number> = { bestDay: 5, bestWeek: 1, longestStreak: 7 };
-
-/** The Monday (`YYYY-MM-DD`) of the week containing the civil day `date`. */
-export function mondayOf(date: string): string {
-  const [year, month, day] = date.split("-").map(Number);
-  const weekday = new Date(Date.UTC(year!, month! - 1, day!)).getUTCDay(); // Sunday 0
-  return addDays(date, -((weekday + 6) % 7));
-}
 
 /** Your best day, week and streak as of the local day `today`, and the ones broken today. */
 export function deriveRecords(you: Days, today: string): Records {

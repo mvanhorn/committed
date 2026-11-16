@@ -26,6 +26,12 @@ export function competitorsOf(row: InstallationRow): string[] {
   return selfFirst(row.login, JSON.parse(row.competitors_json) as string[]);
 }
 
+/** Your pinned rivals still on the board (#125): pinning someone you later hide doesn't count. */
+export function rivalsOf(row: InstallationRow): string[] {
+  const competitors = competitorsOf(row);
+  return (JSON.parse(row.rivals_json) as string[]).filter((login) => competitors.includes(login));
+}
+
 export function standingsFor(
   competitors: readonly string[],
   data: ReadonlyMap<string, LoginData>,
