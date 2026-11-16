@@ -8,6 +8,7 @@ const T0 = 1_793_800_000;
 
 let github: FakeGitHub;
 let limited: boolean;
+let limiterKeys: string[];
 let relay: ReturnType<typeof createRelay>;
 
 function get(query: string, init: RequestInit = {}): Promise<Response> {
@@ -22,6 +23,7 @@ function days(filled: Record<number, number>): number[] {
 beforeEach(() => {
   github = new FakeGitHub();
   limited = false;
+  limiterKeys = [];
   relay = createRelay({
     db: env.DB,
     apns: new FakeApns(),
@@ -29,7 +31,12 @@ beforeEach(() => {
     githubName: github.name,
     now: new Clock(T0).now,
     bundleId: "com.example.app",
-    boardLimiter: { limit: async () => ({ success: !limited }) },
+    boardLimiter: {
+      limit: async ({ key }) => {
+        limiterKeys.push(key);
+        return { success: !limited };
+      },
+    },
   });
 });
 
@@ -156,6 +163,12 @@ describe("GET /v1/race", () => {
     expect(res.status).toBe(429);
     expect(await res.json()).toEqual({ error: "rate_limited" });
     expect(github.requests).toEqual([]);
+  });
+
+  it("has its own budget per IP, apart from /v1/board's", async () => {
+    await get("login=me&rival=alice", { headers: { "cf-connecting-ip": "203.0.113.9" } });
+    // /v1/board keys on the bare IP (publicBoard.test.ts); the challenge page mustn't use it up.
+    expect(limiterKeys).toEqual(["race:203.0.113.9"]);
   });
 
   it("is read-only", async () => {
