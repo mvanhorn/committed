@@ -32,7 +32,7 @@ export const FAQ = [
   },
   {
     q: "What GitHub access does Committed need?",
-    a: "Read-only access to your profile, who you follow, and your organizations. It never asks for repository access or reads your code. Your token stays in the Mac's Keychain or Windows Credential Manager.",
+    a: "Read-only access to your profile, who you follow, and your organizations. It never asks for repository access or reads your code. Your token stays in your iPhone's or Mac's Keychain, or in Windows Credential Manager.",
   },
   {
     q: "Do private contributions count?",
@@ -51,8 +51,8 @@ export const FAQ = [
     a: "About every 5 minutes in the background. Turn on notifications to hear when you pass a friend or they pass you.",
   },
   {
-    q: "Which computers does it run on?",
-    a: `Macs running macOS 26 or later, with Apple silicon or Intel, and Windows 11 PCs. The Windows installer is x64; ARM PCs use x64 emulation. There's no iPhone or web app.${WINDOWS_DOWNLOAD_AVAILABLE ? "" : " The Windows download is coming with the next release."}`,
+    q: "What does it run on?",
+    a: `iPhones running iOS 27.1 or later, from the App Store; Macs running macOS 26 or later, with Apple silicon or Intel; and Windows 11 PCs. The Windows installer is x64; ARM PCs use x64 emulation.${WINDOWS_DOWNLOAD_AVAILABLE ? "" : " The Windows download is coming with the next release."}`,
   },
   {
     q: "Why does Windows show a SmartScreen prompt?",

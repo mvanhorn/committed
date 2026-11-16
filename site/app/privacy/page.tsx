@@ -36,28 +36,38 @@ export default function Privacy() {
           <li>The token is stored in the iPhone’s or Mac’s Keychain, or in Windows Credential Manager. <strong>Disconnect GitHub</strong> deletes it.</li>
           <li>GitHub API calls go straight from your device to GitHub. Contributions come from each person’s public GitHub contribution page, which the apps read anonymously.</li>
           <li>Your people list, Contributions, and the people you hide are saved on your device. They aren’t synced between your devices.</li>
-          <li>On Mac and Windows, Leaderboard Notifications are created on your device. On iPhone they are too, unless you turn on notifications from the Committed relay (below).</li>
+          <li>On Mac and Windows, Leaderboard Notifications are created on your device. On iPhone, notifications come from the Committed relay once you agree to it (below); until then, pass notifications are created on your device.</li>
           <li>The apps contain no analytics or crash reporting.</li>
         </Bullets>
       </Section>
 
       <Section id="relay" title="The Committed relay">
-        <p>The Committed relay keeps Live rank current in the Dynamic Island and on the Lock Screen while the iPhone app is closed, and tells you when someone passes you, or you pass them, with the app closed. It’s used only while Live rank or relay notifications is on, and each can be on without the other. Before either first turns on, the app shows what the relay receives and asks you to turn it on.</p>
+        <p>The Committed relay keeps Live rank current in the Dynamic Island and on the Lock Screen while the iPhone app is closed. It also sends the notifications you turn on, with the app closed: passes, close calls, daily and weekly results, records, the streak reminder and the evening summary.</p>
+        <p>It’s used only while Live rank or at least one notification switch is on, and each can be on without the other. Before either first turns on, the app shows what the relay receives and asks you to turn it on.</p>
         <h3>What it receives</h3>
         <Bullets>
           <li>Your GitHub username and the usernames on your board, in board order. These are public.</li>
           <li>Live rank’s Window, whether Live rank is on, and your time zone.</li>
           <li>The Apple push tokens that update Live rank on your iPhone, and whether your build uses Apple’s test or production push service.</li>
-          <li>With relay notifications on: your notification choices, the rivals you pinned, and the Apple push token that delivers notifications to your iPhone.</li>
+          <li>With relay notifications on: your notification choices (which kinds are on, whose passes, the Window, delivery and quiet hours), the rivals you pinned, and the Apple push token that delivers notifications to your iPhone.</li>
           <li>A random installation ID and secret your iPhone creates. The relay stores only a hash of the secret.</li>
         </Bullets>
         <p>It never receives your GitHub token. That’s sent only to GitHub.</p>
         <h3>What it does</h3>
-        <p>Every 5 minutes, the relay reads the public contribution pages of the usernames it has, anonymously, and keeps the daily counts in a cache shared by everyone. It ranks your board and sends Live rank updates through Apple’s push service. With relay notifications on, it compares your board with its previous check and sends a notification through Apple’s push service when someone passes you, or you pass them. To do that it keeps the counts it last checked, and nothing else about you. The relay runs on Cloudflare.</p>
+        <p>Every 5 minutes, the relay reads the public contribution pages of the usernames it has, anonymously, and keeps the daily counts in a cache shared by everyone. It ranks your board and sends Live rank updates through Apple’s push service.</p>
+        <p>With relay notifications on, it works out from those counts which notifications are due and sends them through Apple’s push service. For that it keeps a small notification state for your iPhone:</p>
+        <Bullets>
+          <li>the counts it last checked, to spot passes;</li>
+          <li>what it has sent: who got a close call today, which records it has announced, and the day results, the streak reminder and the evening summary last went out;</li>
+          <li>what it’s holding: records waiting for quiet hours to end, and the close calls, records and streak reminder waiting for the evening summary.</li>
+        </Bullets>
+        <p>It keeps nothing else about you. The relay runs on Cloudflare.</p>
         <h3>Stopping it</h3>
-        <p>Turning off both Live rank and Leaderboard Notifications in Settings, or <strong>Disconnect GitHub</strong>, deletes your iPhone’s registration from the relay, with everything it holds for it. The relay keeps a registration until then, so do one of these before you delete the app.</p>
+        <p>Turning off Live rank and every notification switch in Settings, or <strong>Disconnect GitHub</strong>, deletes your iPhone’s registration from the relay, with everything it holds for it: your choices, pinned rivals, push tokens and notification state. The relay keeps a registration until then, so do one of these before you delete the app.</p>
         <h3>Committed for NZXT Kraken</h3>
         <p>The <a href="/kraken">Kraken page</a> asks the relay for your rank once a minute. Each request carries a GitHub username, the usernames you’re racing, the Window and your time zone. The relay doesn’t store them; it keeps only the shared cache of public daily counts. The page keeps your settings in your browser, and loads the people you follow from GitHub’s public API.</p>
+        <h3>Challenge pages</h3>
+        <p>A challenge link (gitcommitted.app/vs/<em>you</em>/<em>friend</em>) shows two people’s race over the last 30 days. The page asks the relay for those two usernames’ public daily counts, and the relay answers with only those counts and what follows from them (totals, and who led when). Like the Kraken page’s requests, these aren’t stored; the relay keeps only the shared cache of public daily counts. Challenge pages aren’t indexed by search engines.</p>
       </Section>
 
       <Section id="sample-board" title="The Sample board">
