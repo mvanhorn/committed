@@ -1,0 +1,37 @@
+{
+  "device": "iPhone Duo Simulator",
+  "os": "iOS 27.1",
+  "notes": "Story images: render, not runtime capture. ChallengeShareTests rendered them with RENDER_DIR on a disposable iPhone Duo / iOS 27.1 simulator (scripts/ios_check.py ios). They are the exported PNGs at full size (1080x1920), drawn by the real ChallengeCard from fixed Challenge values (addisonk vs ezra-q: 412-400, 388-400, 400-400), one per headline variant. Avatars show initials because the test's avatar cache is empty. The person view and share sheet are runtime captures (xcrun simctl io --display=1) of a Debug build on the shared iPhone Duo (94D56458-B90B-484A-BA5E-16748D2CBEE5), closed, portrait, with the screenshot fixture (-ScreenshotFixture; you are ari-linden).",
+  "screenshots": [
+    {
+      "file": "story-ahead.png",
+      "caption": "Story, you ahead: \"I'm 12 ahead of you, ezra-q.\" (render, not runtime capture)",
+      "capture": { "sourceCommit": "ffce10ade4d83df66263f34a43ceafeb02b77c9c", "fixture": true }
+    },
+    {
+      "file": "story-behind.png",
+      "caption": "Story, they're ahead: \"You're 12 ahead of me, ezra-q.\" with \"Not for long.\" on its own line (render, not runtime capture)",
+      "capture": { "sourceCommit": "ffce10ade4d83df66263f34a43ceafeb02b77c9c", "fixture": true }
+    },
+    {
+      "file": "story-level.png",
+      "caption": "Story, equal totals: \"Dead level, ezra-q.\" (render, not runtime capture)",
+      "capture": { "sourceCommit": "ffce10ade4d83df66263f34a43ceafeb02b77c9c", "fixture": true }
+    },
+    {
+      "file": "person-challenge.png",
+      "caption": "ezra-q's person view: Challenge under Your race, above the Weekly record (-ScreenshotPerson ezra-q)",
+      "capture": { "sourceCommit": "ffce10ade4d83df66263f34a43ceafeb02b77c9c", "fixture": true }
+    },
+    {
+      "file": "person-yours.png",
+      "caption": "Your own person view: no race and no Challenge (-ScreenshotPerson ari-linden)",
+      "capture": { "sourceCommit": "ffce10ade4d83df66263f34a43ceafeb02b77c9c", "fixture": true }
+    },
+    {
+      "file": "share-sheet.png",
+      "caption": "Share sheet with the story image, opened by itself once the race loaded, through AppModel.requestChallenge (-ScreenshotChallenge ezra-q, the path #137's Share your race will use)",
+      "capture": { "sourceCommit": "ffce10ade4d83df66263f34a43ceafeb02b77c9c", "fixture": true }
+    }
+  ]
+}

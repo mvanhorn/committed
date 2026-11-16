@@ -25,10 +25,22 @@ final class NotificationService: RankChangeNotifying {
     private let defaults: UserDefaults
     /// Replaces the system permission prompt in tests. `nil` asks `UNUserNotificationCenter`.
     private let authorize: (@MainActor () async -> Bool)?
+    /// Replaces the notification center in tests: receives what would be posted. `nil` posts.
+    private let sink: (@MainActor ([RankChangeEvent]) -> Void)?
 
-    init(defaults: UserDefaults = .standard, authorize: (@MainActor () async -> Bool)? = nil) {
+    /// iPhone: true while the app's own crossing notifications give way to relay notifications: the
+    /// relay delivers them (so a pass never arrives twice), or relay notifications have Passes off.
+    /// The app posts none of its own until it's false again. The Mac leaves it.
+    @ObservationIgnored var isDeliveredByRelay: @MainActor () -> Bool = { false }
+
+    init(
+        defaults: UserDefaults = .standard,
+        authorize: (@MainActor () async -> Bool)? = nil,
+        sink: (@MainActor ([RankChangeEvent]) -> Void)? = nil
+    ) {
         self.defaults = defaults
         self.authorize = authorize
+        self.sink = sink
     }
 
     var isEnabled: Bool { defaults.bool(forKey: Self.enabledDefaultsKey) }
@@ -56,15 +68,22 @@ final class NotificationService: RankChangeNotifying {
         return granted
     }
 
+    /// iPhone: switches on without asking, once iOS's permission is already granted (the
+    /// Notifications screen's shared step asks first, then waits for relay consent).
+    func markEnabled() {
+        defaults.set(true, forKey: Self.enabledDefaultsKey)
+    }
+
     func post(_ events: [RankChangeEvent]) {
-        guard isEnabled, !events.isEmpty else { return }
+        guard isEnabled, !events.isEmpty, !isDeliveredByRelay() else { return }
+        if let sink { return sink(events) }
         Task { await deliver(events) }
     }
 
     private func deliver(_ events: [RankChangeEvent]) async {
         // Re-check the toggle after the await — the user may have turned it off between the refresh
         // enqueuing this and delivery.
-        guard isEnabled else { return }
+        guard isEnabled, !isDeliveredByRelay() else { return }
         guard await center.notificationSettings().authorizationStatus == .authorized else { return }
         if events.count > 3 {
             // Coalesce a flurry into one summary rather than stacking many banners.
@@ -74,16 +93,19 @@ final class NotificationService: RankChangeNotifying {
         } else {
             for event in events {
                 let copy = Self.copy(for: event)
-                // Stable per-rival id so a rapid re-fire replaces rather than stacks.
-                await add(id: "rankchange.\(event.rivalUsername)", title: copy.title, body: copy.body)
+                // Stable per-rival id so a rapid re-fire replaces rather than stacks. The same keys
+                // as a relay pass, so a tap on iPhone opens the rival's view either way.
+                await add(id: "rankchange.\(event.rivalUsername)", title: copy.title, body: copy.body,
+                          userInfo: ["kind": "pass", "login": event.rivalUsername])
             }
         }
     }
 
-    private func add(id: String, title: String, body: String) async {
+    private func add(id: String, title: String, body: String, userInfo: [String: String] = [:]) async {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
+        content.userInfo = userInfo
         content.sound = .default
         try? await center.add(UNNotificationRequest(identifier: id, content: content, trigger: nil))
     }

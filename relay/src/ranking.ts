@@ -36,6 +36,13 @@ export function addDays(date: string, delta: number): string {
   return shifted.toISOString().slice(0, 10);
 }
 
+/** The Monday (`YYYY-MM-DD`) of the Monday-to-Sunday week (`FixedWeek`) containing the civil day `date`. */
+export function mondayOf(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const weekday = new Date(Date.UTC(year!, month! - 1, day!)).getUTCDay(); // Sunday 0
+  return addDays(date, -((weekday + 6) % 7));
+}
+
 export interface Standing {
   contributions: number;
   window: Window;

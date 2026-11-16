@@ -44,4 +44,15 @@ struct DeepLinkTests {
         }
         #expect(DeepLink.board(window: nil).url.absoluteString == "committed://board")
     }
+
+    /// The relay's payloads name their kind with these strings (relay/src/notifications: "pass",
+    /// "closeCall", "result", "record", "streakReminder", "summary"); any other kind opens nothing.
+    @Test func notificationKindsAreTheRelaysStrings() {
+        #expect(DeepLink.NotificationKind.allCases.map(\.rawValue)
+            == ["pass", "closeCall", "result", "record", "streakReminder", "summary"])
+        #expect(DeepLink(notification: ["kind": "result"]) == .board(window: nil))
+        #expect(DeepLink(notification: ["kind": "record", "login": "Me"]) == .person(login: "me"))
+        #expect(DeepLink(notification: ["kind": "leaderboard", "login": "me"]) == nil)
+        #expect(DeepLink(notification: ["login": "me"]) == nil)
+    }
 }

@@ -32,7 +32,7 @@ export function SiteFooter() {
     <footer className="mx-auto mt-auto flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-4 border-t border-white/[.08] pt-7 pb-10 text-sm text-muted">
       <span className="flex items-center gap-2.5">
         <Glyph className="size-4 text-lime" />
-        Committed for Mac and Windows
+        Committed for iPhone, Mac and Windows
       </span>
       <nav aria-label="Footer" className="flex flex-wrap gap-x-5">
         <a href={RELEASES_URL} className="py-2.5 hover:text-white">Release notes</a>

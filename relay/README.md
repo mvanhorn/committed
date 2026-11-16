@@ -1,9 +1,13 @@
 # Committed relay
 
 The Committed relay keeps **Live rank** current while the iPhone app is closed (spec #39,
-phase 2; ticket #44). Every 5 minutes it reads public contribution graphs, recomputes each
-registered installation's `LiveRankState`, and sends ActivityKit pushes through APNs. Before
-iOS's 8-hour limit, it ends the activity and starts a fresh one with push-to-start.
+phase 2; ticket #44), and sends **relay notifications** (spec #124: passes first, in #126). Every
+5 minutes it reads public contribution graphs, recomputes each registered installation's
+`LiveRankState`, and sends ActivityKit pushes through APNs. Before iOS's 8-hour limit, it ends
+the activity and starts a fresh one with push-to-start. Then it sends the alert notifications
+each installation asked for.
+
+An installation exists while Live rank **or** relay notifications is on.
 
 It receives only public GitHub usernames. It never accepts, stores, or logs a GitHub token,
 and its logs omit push tokens and install secrets.
@@ -81,12 +85,42 @@ Registers or updates. `{id}` is 8 to 64 characters of `[A-Za-z0-9-]`; a UUID wor
   "competitors": ["addisonk", "alice", "bob"],  // visible board, in board order (ties)
   "window": "daily",                 // "daily" | "weekly" | "monthly"
   "timeZone": "America/New_York",    // IANA
-  "apnsEnvironment": "sandbox"       // "sandbox" | "production"
+  "apnsEnvironment": "sandbox",      // "sandbox" | "production"
+  // Spec #124. All optional: the 1.0.x apps send none of them.
+  "liveRank": true,                  // default true; false = never start, update or rotate an activity
+  "alertToken": "hex…",              // the ordinary APNs device token, or null (default)
+  "notifications": {                 // null (default) = relay notifications off
+    "window": "daily",               // passes and close calls are judged on it; "daily" | "weekly" | "monthly"
+    "passes": "everyone",            // "everyone" | "rivals" | "off"
+    "closeCalls": false,
+    "results": true,
+    "records": true,
+    "streakReminder": false,
+    "delivery": "summary",           // "immediate" | "summary" (passes now, the rest at 9 PM)
+    "quietHours": { "start": "22:00", "end": "08:00" }   // local "HH:MM", or null for off
+  },
+  "rivals": ["alice"]                // pinned rivals, at most 3, each in competitors; default []
 }
 ```
 
 - Logins are lowercased, deduplicated, and kept in the order sent. If `login` is missing from
   `competitors`, it's put first, where the app places itself.
+- A missing key inside `notifications` takes the default shown. Unknown keys there are rejected
+  too (`unknown_field:notifications.<key>`). Error codes: `invalid_live_rank`,
+  `invalid_alert_token`, `invalid_notifications`, `invalid_notifications_window`,
+  `invalid_notifications_passes`, `invalid_notifications_close_calls`,
+  `invalid_notifications_results`, `invalid_notifications_records`,
+  `invalid_notifications_streak_reminder`, `invalid_notifications_delivery`,
+  `invalid_quiet_hours`, `invalid_rivals`, `too_many_rivals`, `unknown_rival`.
+- `liveRank: false` and `notifications: null` together delete the installation (ending any
+  activity, as `DELETE` does) and return `204`; they never create one.
+- Turning `liveRank` off ends the current activity and forgets Live rank's tokens. The relay
+  keeps the alert token only while `notifications` is set.
+- Passes act on `window`, `passes` (`"rivals"` sends only pinned rivals' passes) and quiet hours
+  (#130); close calls on `closeCalls`, `window`, `rivals` and quiet hours (#132); results on
+  `results` and quiet hours (#131); records on `records` (#134); the streak reminder on
+  `streakReminder` (#133); `delivery` decides whether close calls, records and the streak
+  reminder go out right away or in the evening summary (#135).
 - At most 1,000 competitors, self included.
 - Returns `201` on creation, `200` on update.
 - A changed competitor list resets today's movement baseline, as a visibility change does in
@@ -116,6 +150,45 @@ shared 5-minute `contribution_cache`. Nothing else is stored.
 - `movementToday` is always 0: there's no per-board baseline.
 - `Access-Control-Allow-Origin: *`, `Cache-Control: public, max-age=60`.
 - Rate limited per `cf-connecting-ip` by the `BOARD_LIMITER` binding (20 a minute); past that, `429`.
+
+### `GET /v1/race?login=&rival=&tz=`
+
+Public and unauthenticated, for the challenge page (`gitcommitted.app/vs/<login>/<rival>`). Two
+people's race over the Board's 30 days Window, computed on request through the same shared
+5-minute `contribution_cache`, so it costs at most two GitHub fetches. Nothing else is stored.
+
+- `login` (the challenger) and `rival` are normalized like a registration and must differ; `tz` is
+  an IANA time zone (default `UTC`) that sets which 30 days are raced.
+- Returns:
+
+  ```json
+  {
+    "login": "addisonk",
+    "rival": "ezra-q",
+    "dates": ["2026-10-17", "…", "2026-11-15"],
+    "days": { "addisonk": [3, 0, "…"], "ezra-q": [1, 4, "…"] },
+    "totals": { "addisonk": 412, "ezra-q": 400 },
+    "latestLeadChange": { "date": "2026-11-09", "login": "addisonk", "kind": "passed" },
+    "leadChanges": 3,
+    "updatedAt": 1794790000
+  }
+  ```
+
+  - `dates` are the 30 raced days, oldest first, ending today in `tz`; `days` gives each login's
+    count for each of them, and `totals` their sums (the Board's 30 days totals).
+  - The lead follows the app's race story (`PersonSummary.Story`) over the two running totals: a
+    level day keeps whoever led before it, so only a strict lead counts. `latestLeadChange.kind` is
+    `pulledAhead` (the first lead, taken from level), `passed` (the lead changed hands; `leadChanges`
+    counts how often) or `caught` (level now; `date` is the first day of that level run). It's
+    `null` when one person has led since the first day, or when they've never been apart.
+  - `updatedAt` is the older of the two counts' fetch times, in Unix seconds.
+- Errors use the usual `{ "error": code }`: `400` with `invalid_login`, `invalid_rival` (missing,
+  malformed, or the same as `login`) or `invalid_time_zone`; `404` `unknown_login` when either
+  calendar can't be read and nothing is cached, which isn't cached publicly.
+- `Access-Control-Allow-Origin: *`, `Cache-Control: public, max-age=60` on success.
+- Rate limited per `cf-connecting-ip` by `BOARD_LIMITER` (20 a minute), counted apart from
+  `/v1/board`; past that, `429`. The site reads it from Vercel's servers, which share their
+  outbound IPs, so the site reuses each pair's read for a minute; a failed read isn't reused.
 
 ### Limits
 
@@ -394,10 +467,174 @@ WIDGET_SCREENS=/some/dir npm run test:browser   # also save a screenshot of each
    - Today resets in place at local midnight; that's just a state change.
 7. **Dead tokens.** `410`, or `400` with `BadDeviceToken` or `DeviceTokenNotForTopic`, clears
    the token that was used.
+8. **Live rank off.** With `liveRank = false`, steps 5 and 6 are skipped: no push-to-start,
+   update or rotation. The movement baseline is still recorded for the board route.
+9. **Relay notifications** (`src/notifications/`, one file per kind), after every installation's
+   Live rank pushes, for installations with `notifications` and an `alertToken`:
+   - **Passes** (`passes.ts`) port `RankChangeDetector.crossings`: "was at or below you, now
+     strictly above you", or the reverse. Holding a tie fires nothing. They're judged on the
+     preferences' Window among the visible board, against the counts of the previous run. The
+     first look, a new local day and a new Window take a fresh baseline silently. While your
+     own count is missing, the last baseline is kept.
+   - With `passes: "rivals"`, only crossings with your pinned `rivals` are sent (none while
+     nobody is pinned). The baseline still holds everyone visible, so pinning someone or
+     switching between everyone and rivals never replays an earlier pass.
+   - **Quiet hours** (`quietHours.ts`, `isQuietHours`) are judged on the installation's local
+     clock, start inclusive and end exclusive, wrapping past midnight when the end is earlier
+     (the default, 22:00–08:00). Off, or the same start and end, is never quiet. A pass during
+     quiet hours is still sent, with `"interruption-level": "passive"` and no `sound`. Later
+     kinds use the same check.
+   - Each pass is one alert push: `apns-push-type: alert`, `apns-topic: <APNS_BUNDLE_ID>`,
+     priority 10, no `apns-collapse-id` (one notification per pass: a later crossing with the
+     same person never replaces an unread one), with the shipped copy from
+     `NotificationService.copy(for:)`:
+
+     ```json
+     {
+       "aps": {
+         "alert": { "title": "😤 alice passed you", "body": "They're ahead 7–5. Time to catch up!" },
+         "sound": "default", "category": "PASS", "thread-id": "passes"
+       },
+       "kind": "pass",
+       "login": "alice"
+     }
+     ```
+
+   - **Close calls** (`closeCalls.ts`, with `closeCalls: true`): you're 1 to
+     `max(3, ceil(5% of their count))` contributions behind someone, on the preferences' Window.
+     With `rivals` pinned, each pinned rival you're that close behind (even with someone in
+     between); with nobody pinned, only the person directly above you (`order`, you first among
+     ties). At most one per person per local day (`{"closeCalls": {"date", "sent": [logins]}}`),
+     and none during quiet hours: one still close when they end goes out then. None, sent or
+     held, about someone a pass was sent about in the same cycle (`passedThisCycle`): the pass
+     already names them and the gap, and they count as sent for the day. They run with
+     `passes: "off"` too. `sendCloseCallsNow` is the immediate-delivery step; in summary delivery
+     they're held for the evening summary instead. Each is one alert push,
+     `apns-collapse-id: closeCall.<login>`; a tap opens that person's view:
+
+     ```json
+     {
+       "aps": {
+         "alert": { "title": "Close call: 2 to pass odile-m", "body": "You're at 31, they're at 33 · Today" },
+         "sound": "default", "thread-id": "closeCalls"
+       },
+       "kind": "closeCall",
+       "login": "odile-m"
+     }
+     ```
+
+   - **Results** (`results.ts`, #131): each morning, yesterday's Today standings; on Mondays also
+     last week's final, the Monday-to-Sunday standings (`fixedWeeks`, a port of `FixedWeek`).
+     They go out at the end of quiet hours, or at 08:00 with quiet hours off, in the
+     installation's time zone, at most once a local day, and wait while it's quiet or your own
+     count is missing. Ranked with `order` among the visible people with data, so a tie is
+     yours. Skipped with no visible rival or when nobody contributed. The first look, or the
+     first after more than a day, settles a morning already past without sending (turning
+     results on at 3 PM doesn't send yesterday's then). A registration that turns results on
+     (relay notifications back from `null`, or `results` false → true) past that morning's send
+     time settles the morning too (`stateOnRegistration`), since the cycle doesn't run while
+     notifications are off. Turning `results` off drops its state.
+     Each is one alert with `apns-collapse-id: result.daily` or `result.weekly`, no category, and
+     `"thread-id": "results"`; the app opens the Board on a tap:
+
+     ```json
+     {
+       "aps": {
+         "alert": { "title": "You won yesterday", "body": "41 contributions, 8 ahead of alice." },
+         "sound": "default", "thread-id": "results"
+       },
+       "kind": "result"
+     }
+     ```
+
+     The other copy: "You finished #2 yesterday" / "alice won with 50. You had 41.", "Last
+     week's final: #1" / "186 contributions, 5 ahead of alice." (or "Last week's final: #2" /
+     "bob won with 200. You had 186."). A tie for first says "41 contributions, level with
+     alice."; one contribution is "1 contribution".
+   - **Records** (`records.ts`, with `records: true`) port the best day, best week and longest
+     streak of `PersonalRecords` (#127): each is announced the first time it's broken in its day
+     or week, only when its old best is at least 5 (best day), 1 (best week) or 7 days (streak).
+     Equalling isn't a record. One alert per record, `thread-id: "records"`,
+     `apns-collapse-id: record.<id>`, `"kind": "record"` and your own `login`, which the app opens:
+     "New best day" / "41 today. Your old best was 33, on March 4.", "New best week" /
+     "186 so far this week. Your old best was 171.", "Your longest streak yet" /
+     "53 days, past your old best of 52.". A record due during quiet hours is held until they
+     end, then sent with the day's (or week's) latest number, saying "yesterday" or "last week"
+     when its day or week is over. A held record goes stale (`isStillDue`) once the day after it
+     has passed, or for a best week once its week and the day after it have; stale records
+     (held while relay notifications were off, say) are dropped, never sent late, and the
+     evening summary drops them the same way. Finding records and sending them (`sendRecordsNow`) are
+     separate steps; in summary delivery the evening summary takes them instead. State:
+     `{"records": {"sent": [ids], "held": [records]}}`; turning Records off drops what's held.
+   - **Streak reminder** (`streakReminder.ts`, with `streakReminder: true`): "Your 40-day
+     streak" / "Nothing yet today. It keeps going if you contribute by midnight." Due from 8 PM
+     local, or an hour before quiet hours start when that falls between noon and 8 PM, while
+     your streak (`currentStreak`) is at least 2 and today's count is 0. Not sent during quiet
+     hours, while your own count is older than 20 minutes (a failing fetch keeps old days, which
+     could wrongly say "nothing yet"), or twice in one local day. One alert push,
+     `apns-collapse-id: streak`, with `"thread-id": "streak"`, no category, `"kind":
+     "streakReminder"` and `"login"` set to your own login (a tap opens your own view). Sending is
+     its own step (`sendStreakReminder`); in summary delivery the evening summary holds it.
+   - **Evening summary** (`summary.ts`, #135): with `delivery: "summary"` (the default, "Passes
+     now, the rest at 9 PM"), close calls, records and the streak reminder are held at their send
+     steps instead of going out; passes and results are unaffected. One alert, "Your day so far",
+     goes out at 21:00 local, or when quiet hours start if that's between noon and 21:00, once a
+     local day, only if something held is still worth saying. The body is short lines joined with
+     " · ": where you stand on today's Board ("#2 today with 41", whenever you have a rank: a
+     visible rival with data, and someone contributed), then each record with the day's latest
+     number, best day before best week before streak ("New best day: 41", "New best week: 186", "Your longest streak yet: 53 days"; a record
+     quiet hours held overnight says "41 yesterday" or "186 last week"), each close call with
+     today's gap ("Close call: 2 to pass odile-m"), and the streak reminder ("Your 40-day streak
+     needs one contribution by midnight"). When it's sent, a close call you've closed, that's no
+     longer close or about someone no longer on your board, a reminder you've answered, anything
+     else from an earlier day, and any kind switched off are dropped; with nothing left, nothing is
+     sent. So a close call or streak reminder first due after the summary went out never arrives,
+     and a record found then goes in the next evening's. The
+     summary isn't held back by quiet hours (their start can be its time); a run more than ten
+     minutes into them sends it passively, without a sound. What was held before switching to
+     Right away still goes out that evening. One alert with `apns-collapse-id: summary`, no
+     category, no `login`; the app opens the Board on a tap:
+
+     ```json
+     {
+       "aps": {
+         "alert": { "title": "Your day so far", "body": "#2 today with 41 · New best day: 41 · Close call: 2 to pass odile-m" },
+         "sound": "default", "thread-id": "summary"
+       },
+       "kind": "summary"
+     }
+     ```
+
+     State: `{"summary": {"settled": "YYYY-MM-DD", "closeCalls": [calls], "streak": reminder |
+     null, "records": [records]}}`, saved with the held kind's own marker; `settled` is the last
+     local day whose summary was settled (sent, or nothing left to send). The kinds hold through
+     `summaryHold.ts` (which imports nothing from them but types), and each renders its own
+     summary line (`recordSummaryLines`, `closeCallSummaryLines`, `streakReminderSummaryLine`),
+     so summary.ts imports the kinds and none imports it back.
+   - Counts in every kind's copy but passes are grouped as the app shows them ("1,204",
+     `format.ts`); pass copy stays exactly the shipped `NotificationService.copy(for:)`.
+   - State lives in one JSON column, `notification_state`, keyed by kind
+     (`{"passes": {"window", "date", "counts"}, "results": {"date"}, "streak": {"date"}, "summary": {…}}`;
+     `streak.date` is the local day of the last reminder). It's saved before anything is sent, so
+     a failure can't send the same notification twice. Later kinds add their own keys and keep the
+     ones they don't own.
+   - A dead alert token is cleared (only if it's still the stored one) and logged as
+     `token_cleared` with `token: "alert"`.
 
 APNs auth is an ES256 JWT signed with WebCrypto from the `.p8` key and cached for 50 minutes.
 
-## Conformance fixture
+## Conformance fixtures
+
+`../fixtures/habit-conformance.json` (spec #124) is shared with the Mac test target. Its
+`passes` cases run against `RankChangeDetector` and `NotificationService.copy(for:)` in
+`CommitStandingsTests/HabitPassConformanceTests.swift`, and against `src/notifications/passes.ts`
+in `test/habitPasses.test.ts`, so a pass the app would post is the pass the relay sends, in the
+same words. Its `weeks` cases run against `FixedWeek` in
+`CommitStandingsTests/HabitWeekConformanceTests.swift` and against `fixedWeeks` in
+`test/habitWeeks.test.ts`, so last week's final covers the same Monday to Sunday as the app's
+weeks. Its `records` cases run against `PersonalRecords` in
+`CommitStandingsTests/HabitRecordConformanceTests.swift`, and against `src/notifications/records.ts`
+in `test/habitRecords.test.ts` (best day, best week, longest streak and what's broken today).
 
 `../fixtures/ranking-conformance.json` is shared with the Mac test target and the Windows core
 (`windows/core/tests/conformance.rs`, which checks `order` and streaks: Windows has no Live rank),
@@ -481,7 +718,12 @@ so the Swift ordering, this port and the Windows board can't drift.
    ```
    `APNS_BUNDLE_ID` is a var in `wrangler.jsonc` (`com.addisonk.CommitStandings.iOS`).
 4. Deploy with `npx wrangler deploy`. The cron trigger deploys with it.
-5. Plan limits: each run makes one subrequest per uncached login, plus one per push. The
+5. **Order for a schema change** (for example `0004_notifications.sql`, spec #124): apply the
+   migration (`npx wrangler d1 migrations apply committed-relay --remote`), then deploy the
+   Worker, then ship the app. Migrations are additive with defaults, so the Worker already
+   running keeps working after step one. An app that sends new fields to an older Worker gets
+   `400 unknown_field:…`, so the app goes last.
+6. Plan limits: each run makes one subrequest per uncached login, plus one per push. The
    Workers Free plan's per-invocation subrequest cap (50 at the time of writing) only covers a
    small board, so use Workers Paid for real use. Check current limits before deploying.
 

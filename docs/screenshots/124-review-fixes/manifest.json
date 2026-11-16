@@ -1,0 +1,110 @@
+{
+  "device": "iPhone Duo Simulator (shared persistent Duo 94D56458-B90B-484A-BA5E-16748D2CBEE5), closed, portrait",
+  "os": "iOS 27.1",
+  "notes": "Runtime captures, not renders, for the spec #124 review fixes on review/124-fixes (items 1, 2, 4, 5). The app has one (dark) appearance. Not captured: the open iPhone Duo, accessibility text sizes, light mode on the site, and share images after the ShareImageRenderer refactor (#18; covered by BoardShareTests).",
+  "screenshots": [
+    {
+      "file": "relay-sheet.png",
+      "caption": "Relay sheet (Live rank), top: unchanged opening",
+      "capture": {
+        "sourceCommit": "9bb4cc7eb8fe441200a246443d1c208890bf591e",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo 94D56458-B90B-484A-BA5E-16748D2CBEE5 closed, portrait, captured with xcrun simctl io --display=1 inside one apple-session lease. Launched with no other flags."
+    },
+    {
+      "file": "relay-sheet-end.png",
+      "caption": "Relay sheet, end: the Notifications point now says what the relay gets for them (notification choices, the rivals you pinned, the notification token); footnote: Live rank and every notification off deletes the registration",
+      "capture": {
+        "sourceCommit": "9bb4cc7eb8fe441200a246443d1c208890bf591e",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo 94D56458-B90B-484A-BA5E-16748D2CBEE5 closed, portrait, captured with xcrun simctl io --display=1 inside one apple-session lease. -ScreenshotSheetEnd. Before: docs/screenshots/126-relay-passes/after-relay-sheet-end.png."
+    },
+    {
+      "file": "consent-sheet.png",
+      "caption": "Short consent sheet, top: the relay 'sends the notifications you turn on' (was: tells you when someone passes you)",
+      "capture": {
+        "sourceCommit": "9bb4cc7eb8fe441200a246443d1c208890bf591e",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo 94D56458-B90B-484A-BA5E-16748D2CBEE5 closed, portrait, captured with xcrun simctl io --display=1 inside one apple-session lease. -RelayDisclosureAccepted -notifyOnPositionChange YES. Before: docs/screenshots/126-relay-passes/reconsent-sheet.png."
+    },
+    {
+      "file": "consent-sheet-end.png",
+      "caption": "Short consent sheet, end: it also gets your time zone, notification choices, the rivals you pinned and the notification token",
+      "capture": {
+        "sourceCommit": "9bb4cc7eb8fe441200a246443d1c208890bf591e",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo 94D56458-B90B-484A-BA5E-16748D2CBEE5 closed, portrait, captured with xcrun simctl io --display=1 inside one apple-session lease. -RelayDisclosureAccepted -notifyOnPositionChange YES -ScreenshotSheetEnd. Before: docs/screenshots/126-relay-passes/reconsent-sheet-end.png."
+    },
+    {
+      "file": "about-you-summary.png",
+      "caption": "About you, default delivery (summary): each switch's own line says it arrives in the summary at 9 PM; no section footer under Streak reminder",
+      "capture": {
+        "sourceCommit": "9bb4cc7eb8fe441200a246443d1c208890bf591e",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo 94D56458-B90B-484A-BA5E-16748D2CBEE5 closed, portrait, captured with xcrun simctl io --display=1 inside one apple-session lease. Launched with -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotTab settings -ScreenshotNotifications -ScreenshotNotificationsAboutYou (scrolls to About you; its header sits under the nav bar's blur) -ScreenshotStreakReminder. Before: docs/screenshots/135-evening-summary/notifications-delivery-summary.png (old Records footer below Streak reminder)."
+    },
+    {
+      "file": "about-you-summary-early-quiet-hours.png",
+      "caption": "About you with quiet hours from 8:30 PM: both lines say 8:30 PM, matching the Delivery footer",
+      "capture": {
+        "sourceCommit": "9bb4cc7eb8fe441200a246443d1c208890bf591e",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo 94D56458-B90B-484A-BA5E-16748D2CBEE5 closed, portrait, captured with xcrun simctl io --display=1 inside one apple-session lease. Launched with -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotTab settings -ScreenshotNotifications -ScreenshotNotificationsAboutYou (scrolls to About you; its header sits under the nav bar's blur) -ScreenshotStreakReminder -ScreenshotQuietHours 20:30-07:00."
+    },
+    {
+      "file": "about-you-right-away.png",
+      "caption": "About you, Right away: Records says one set during quiet hours comes when they end; Streak reminder at 8 PM or an hour before quiet hours",
+      "capture": {
+        "sourceCommit": "9bb4cc7eb8fe441200a246443d1c208890bf591e",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo 94D56458-B90B-484A-BA5E-16748D2CBEE5 closed, portrait, captured with xcrun simctl io --display=1 inside one apple-session lease. Launched with -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotTab settings -ScreenshotNotifications -ScreenshotNotificationsAboutYou (scrolls to About you; its header sits under the nav bar's blur) -ScreenshotStreakReminder -ScreenshotDelivery immediate."
+    },
+    {
+      "file": "about-you-right-away-no-quiet-hours.png",
+      "caption": "About you, Right away with quiet hours off: Records line without the quiet-hours sentence",
+      "capture": {
+        "sourceCommit": "9bb4cc7eb8fe441200a246443d1c208890bf591e",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo 94D56458-B90B-484A-BA5E-16748D2CBEE5 closed, portrait, captured with xcrun simctl io --display=1 inside one apple-session lease. Launched with -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotTab settings -ScreenshotNotifications -ScreenshotNotificationsAboutYou (scrolls to About you; its header sits under the nav bar's blur) -ScreenshotStreakReminder -ScreenshotDelivery immediate -ScreenshotQuietHours off."
+    },
+    {
+      "file": "site-home-faq-footer.png",
+      "caption": "Site home: FAQ 'What does it run on?' names the iPhone app (iOS 27.1+); footer 'Committed for iPhone, Mac and Windows'",
+      "capture": {
+        "sourceCommit": "9bb4cc7eb8fe441200a246443d1c208890bf591e",
+        "fixture": true
+      },
+      "notes": "next start of this commit's production build (npm run build), localhost, T3 in-app browser, 1280 px wide; FAQ item opened by script. No before capture (the previous copy is in git: 'There's no iPhone or web app', 'Committed for Mac and Windows').",
+      "device": "T3 in-app browser (Chromium), desktop 1280 px",
+      "os": "macOS 27"
+    },
+    {
+      "file": "site-privacy-relay.png",
+      "caption": "Site privacy page, The Committed relay: every notification kind, what it receives and holds, deletion on Live rank plus every switch off, and challenge pages",
+      "capture": {
+        "sourceCommit": "9bb4cc7eb8fe441200a246443d1c208890bf591e",
+        "fixture": true
+      },
+      "notes": "next start of this commit's production build, localhost, T3 in-app browser, 1280 \u00d7 1834 viewport scrolled to the relay section. No before capture (previous text in git).",
+      "device": "T3 in-app browser (Chromium), desktop 1280 px",
+      "os": "macOS 27"
+    },
+    {
+      "file": "person-weekly-record.png",
+      "caption": "odile-m's view after #17: the Weekly record card, now injected through the iPhone's raceAccessory slot, still sits under Your race and Challenge with the same spacing",
+      "capture": {
+        "sourceCommit": "9bb4cc7eb8fe441200a246443d1c208890bf591e",
+        "fixture": true
+      },
+      "notes": "Same capture build and device as the other iPhone captures. Launched with -ScreenshotFixture -ScreenshotDate 2026-11-16T17:00:00Z -ScreenshotPerson odile-m -RelayDisclosureAccepted -RelayNotificationsAccepted (#129's flags plus the accepted relay sheets, since this build has a relay URL). Before: docs/screenshots/129-rivalry-record/person-weekly-record.png (no Challenge there: captured before #136)."
+    }
+  ]
+}

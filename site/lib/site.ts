@@ -6,11 +6,11 @@ export const WINDOWS_DOWNLOAD_AVAILABLE = process.env.NEXT_PUBLIC_WINDOWS_DOWNLO
 /** Contact goes through GitHub: Issues for questions and bugs, private advisories for security. */
 export const ISSUES_URL = "https://github.com/prompthunt/committed/issues";
 export const SECURITY_REPORT_URL = "https://github.com/prompthunt/committed/security/advisories/new";
-export const PRIVACY_EFFECTIVE_DATE = "November 8, 2026";
+export const PRIVACY_EFFECTIVE_DATE = "November 15, 2026";
 
-export const TITLE = "Committed — A GitHub leaderboard for Mac and Windows";
+export const TITLE = "Committed — A GitHub leaderboard for iPhone, Mac and Windows";
 export const DESCRIPTION =
-  "A free, open-source GitHub leaderboard for your Mac’s menu bar or Windows tray. Compare contributions with friends and teammates, and get alerts when ranks change.";
+  "A free, open-source GitHub leaderboard for your iPhone, your Mac’s menu bar or your Windows tray. Compare contributions with friends and teammates, and get alerts when ranks change.";
 
 /** Answers are plain text: they render on the page and go verbatim into the FAQPage schema. */
 export const FAQ = [
@@ -32,7 +32,7 @@ export const FAQ = [
   },
   {
     q: "What GitHub access does Committed need?",
-    a: "Read-only access to your profile, who you follow, and your organizations. It never asks for repository access or reads your code. Your token stays in the Mac's Keychain or Windows Credential Manager.",
+    a: "Read-only access to your profile, who you follow, and your organizations. It never asks for repository access or reads your code. Your token stays in your iPhone's or Mac's Keychain, or in Windows Credential Manager.",
   },
   {
     q: "Do private contributions count?",
@@ -51,8 +51,8 @@ export const FAQ = [
     a: "About every 5 minutes in the background. Turn on notifications to hear when you pass a friend or they pass you.",
   },
   {
-    q: "Which computers does it run on?",
-    a: `Macs running macOS 26 or later, with Apple silicon or Intel, and Windows 11 PCs. The Windows installer is x64; ARM PCs use x64 emulation. There's no iPhone or web app.${WINDOWS_DOWNLOAD_AVAILABLE ? "" : " The Windows download is coming with the next release."}`,
+    q: "What does it run on?",
+    a: `iPhones running iOS 27.1 or later, from the App Store; Macs running macOS 26 or later, with Apple silicon or Intel; and Windows 11 PCs. The Windows installer is x64; ARM PCs use x64 emulation.${WINDOWS_DOWNLOAD_AVAILABLE ? "" : " The Windows download is coming with the next release."}`,
   },
   {
     q: "Why does Windows show a SmartScreen prompt?",

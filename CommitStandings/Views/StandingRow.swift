@@ -13,6 +13,14 @@ struct StandingRow: View {
     /// Days in a row with a contribution (`ContributionHistory.currentStreak`). Shown as the streak
     /// mark and "12" from 2 days, and only once this row's count has loaded. nil ⇒ no history yet.
     var streak: Int? = nil
+    /// A line under the name: the gap on the iPhone's Your rivals ("3 to pass", "Level"). nil ⇒ the
+    /// row stays one line, as everywhere else.
+    var caption: String? = nil
+    /// Shown in place of the streak: a rivalry record ("7–5") on Your rivals. nil ⇒ the streak.
+    var record: String? = nil
+    /// How VoiceOver reads `record`: "You've won 7 of the last 12 weeks against ezra-q". nil ⇒
+    /// "record 7–5".
+    var recordSpoken: String? = nil
     /// Grows with Dynamic Type on iPhone so "#12" never truncates; stays 24pt on the Mac.
     @ScaledMetric(relativeTo: .caption) private var rankWidth: CGFloat = 24
     /// iPhone at accessibility text sizes wraps long usernames instead of truncating them.
@@ -55,29 +63,18 @@ struct StandingRow: View {
                 .foregroundStyle(style.rankColor.map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
                 .frame(width: rankWidth * style.rankWidthScale, alignment: .trailing)
             AvatarView(username: competitor.username, size: style.avatarSize)
-            HStack(spacing: 4) {
-                Text(competitor.username)
-                    .font(competitor.isSelf ? style.selfNameFont : style.nameFont)
-                    .lineLimit(wraps || dynamicTypeSize.isAccessibilitySize ? 2 : 1)
-                    // Where a second line has no room (a small widget's four rows), shrink a little.
-                    .minimumScaleFactor(wraps ? 0.75 : 1)
-                    .truncationMode(.middle)
-                if badge {
-                    Text("you")
-                        .font(style.badgeFont)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(accent.opacity(style.badgeFillOpacity), in: .capsule)
-                        .foregroundStyle(style.badgeForeground.map(AnyShapeStyle.init) ?? accent)
-                }
-            }
+            nameStack(badge: badge, wraps: wraps)
             Spacer(minLength: 6)
             // Numbers are never cut or wrapped ("6,28" over "7"): this group lays out first, so the
             // name truncates before the count gives up any width. Only where even the count can't
             // fit (the largest text sizes) does it shrink a little, still on one line.
             HStack(spacing: 4) {
                 rankDeltaIndicator
-                if showsStreak { streakLabel }
+                if let record {
+                    recordLabel(record)
+                } else if showsStreak {
+                    streakLabel
+                }
                 contributionsLabel
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -86,6 +83,53 @@ struct StandingRow: View {
             .layoutPriority(1)
             contributionSquare
         }
+    }
+
+    /// The name (with the "you" badge), and the caption under it when the row has one.
+    @ViewBuilder
+    private func nameStack(badge: Bool, wraps: Bool) -> some View {
+        if let caption {
+            VStack(alignment: .leading, spacing: 1) {
+                nameLine(badge: badge, wraps: wraps)
+                Text(caption)
+                    .font(style.captionFont)
+                    .foregroundStyle(style.captionColor.map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
+                    .lineLimit(1)
+            }
+        } else {
+            nameLine(badge: badge, wraps: wraps)
+        }
+    }
+
+    private func nameLine(badge: Bool, wraps: Bool) -> some View {
+        HStack(spacing: 4) {
+            Text(competitor.username)
+                .font(competitor.isSelf ? style.selfNameFont : style.nameFont)
+                .lineLimit(wraps || dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                // Where a second line has no room (a small widget's four rows), shrink a little.
+                .minimumScaleFactor(wraps ? 0.75 : 1)
+                .truncationMode(.middle)
+            if badge {
+                Text("you")
+                    .font(style.badgeFont)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(accent.opacity(style.badgeFillOpacity), in: .capsule)
+                    .foregroundStyle(style.badgeForeground.map(AnyShapeStyle.init) ?? accent)
+            }
+        }
+    }
+
+    /// The record in the streak's place, in the streak's type.
+    private func recordLabel(_ record: String) -> some View {
+        Text(record)
+            .font(style.streakFont)
+            .monospacedDigit()
+            .foregroundStyle(style.streakColor.map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
+            .lineLimit(1)
+            .fixedSize()
+            // The row's own label reads the record.
+            .accessibilityHidden(true)
     }
 
     /// The window's trolling day, once the row has data.
@@ -194,9 +238,23 @@ struct StandingRow: View {
         let movement = rankDelta.map { delta in
             delta == 0 ? "" : ", \(delta > 0 ? "up" : "down") \(delta.magnitude) \(delta.magnitude == 1 ? "place" : "places") today"
         } ?? ""
-        let streak = hasData ? StreakLabel.spoken(streak).map { ", " + $0 } ?? "" : ""
+        // A record (Your rivals) is read in the streak's place, as it's drawn there.
+        let streakOrRecord: String
+        if let record {
+            if let recordSpoken {
+                let lowered: String = recordSpoken.prefix(1).lowercased() + String(recordSpoken.dropFirst())
+                streakOrRecord = ", " + lowered
+            } else {
+                streakOrRecord = ", record \(record)"
+            }
+        } else if hasData, let spokenStreak = StreakLabel.spoken(streak) {
+            streakOrRecord = ", " + spokenStreak
+        } else {
+            streakOrRecord = ""
+        }
         let trolling = trollDescription.map { ", trolling: \($0)" } ?? ""
-        return standingDescription + streak + movement + trolling
+        let gap = caption.map { ", " + $0.lowercased() } ?? ""
+        return standingDescription + gap + streakOrRecord + movement + trolling
     }
 
     /// The streak's number beside the mark ("12", "365+"), or nil: under 2 days, or no count

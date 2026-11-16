@@ -9,16 +9,32 @@ import UIKit
 ///
 /// Optional, after `-ScreenshotFixture`: `-ScreenshotTab people|settings` opens on that tab,
 /// `-ScreenshotHide <login>` hides that person before the first refresh (so Today still moves),
+/// `-ScreenshotPin <login,login>` pins those people as rivals (Your rivals on the Board),
+/// `-ScreenshotRivalLimit` shows Rival's "You can pin up to 3 rivals" on a person view opened with
+/// three rivals already pinned, as a tap would,
 /// `-ScreenshotWindow <raw value>` opens the board on that Window (`monthly` for 30 days),
 /// `-ScreenshotDate <ISO 8601>` sets the app's clock, `-ScreenshotShare` opens Share board once the
 /// board has loaded,
 /// `-ScreenshotPerson <login>` opens that person's view (pushed onto the Board, or the second pane on the open
 /// iPhone Duo) and `-ScreenshotPersonDay <n>` selects that day's bar instead of today's
-/// (`-ScreenshotPersonEnd` scrolls it to the end),
+/// (`-ScreenshotPersonEnd` scrolls it to the end), `-ScreenshotChallenge <login>` opens that person's
+/// view and their Challenge share once their race loads (as a notification's Share your race does),
+/// `-ScreenshotNotificationResponse <action>:<login>` responds to a relay pass notification at launch,
 /// `-ScreenshotTroll <login>` gives that person a trolling day (784 more, the troll face),
+/// `-ScreenshotCalendarFrom <login>=<YYYY-MM-DD>` starts that person's calendar on that day once the
+/// board loads (empty weeks in their Weekly record),
+/// `-ScreenshotRecordDay <n>` makes your count today n (a big one sets a record: the record card
+/// and New tiles in Your records; `-ScreenshotShareRecord` then taps the card's Share), `-ScreenshotHide` takes several logins separated by commas,
 /// `-ScreenshotCountScale <n>` multiplies everyone's counts by n (30 puts every 30-day count in
 /// the thousands beside the streaks, the board's widest rows), and
 /// `-LiveRankPayload <file.json>` shows a Live Activity push payload's content state in Live rank,
+/// `-ScreenshotNotifications` opens Settings ▸ Notifications (with `-ScreenshotTab settings`;
+/// `-ScreenshotNotificationsEnd` scrolls it to Delivery),
+/// `-ScreenshotPasses rivals`, `-ScreenshotCloseCalls`, `-ScreenshotResults off`, `-ScreenshotRecords off`,
+/// `-ScreenshotStreakReminder`, `-ScreenshotDelivery immediate` and `-ScreenshotQuietHours 23:30-07:00`
+/// (or `off`) set the board owner's notification choices,
+/// `-ScreenshotNotificationsDenied` reads iOS's permission as denied,
+/// `-ScreenshotNoRelay` runs a relay build as one without the relay,
 /// and `-RelayDisclosureAccepted` starts with the Committed relay disclosure already accepted (for
 /// builds with `COMMITTED_RELAY_URL`; without it, a relay build shows the disclosure sheet).
 ///
@@ -50,6 +66,36 @@ enum ScreenshotFixture {
         value(after: "-ScreenshotPerson")
     }
 
+    /// `-ScreenshotChallenge <login>`: opens that person's view and presents their Challenge share
+    /// once their race has loaded, through `AppModel.requestChallenge`.
+    static var requestedChallenge: String? {
+        value(after: "-ScreenshotChallenge")
+    }
+
+    /// `-ScreenshotNotificationResponse <action>:<login>`: at launch, a response to a relay pass
+    /// notification about `login`, as if `action` (`SHARE_RACE`, `OPEN_BOARD`, or iOS's body-tap
+    /// identifier) had been chosen with Committed closed. Once the fixture's people load, it goes
+    /// through the notification delegate's own route (`ForegroundNotificationPresenter.receive`).
+    /// No notification is shown or tapped. `-ScreenshotNotificationKind closeCall` makes it a relay
+    /// close call (#132) instead, which has no category; `streakReminder` a streak reminder (#133),
+    /// whose login is your own; `summary` the evening summary (#135), which names no one (the login
+    /// is ignored).
+    static var notificationResponse: DeepLink? {
+        guard let raw = value(after: "-ScreenshotNotificationResponse"),
+              let colon = raw.lastIndex(of: ":") else { return nil }
+        let action = String(raw[..<colon]), login = String(raw[raw.index(after: colon)...])
+        let kind = value(after: "-ScreenshotNotificationKind").flatMap(DeepLink.NotificationKind.init(rawValue:)) ?? .pass
+        switch kind {
+        case .summary, .result:
+            return DeepLink(notification: ["kind": kind.rawValue], action: action)
+        case .closeCall, .record, .streakReminder:
+            return DeepLink(notification: ["kind": kind.rawValue, "login": login], action: action)
+        case .pass:
+            return DeepLink(notification: ["kind": kind.rawValue, "login": login, "aps": ["category": DeepLink.passCategory]],
+                            action: action)
+        }
+    }
+
     /// `-ScreenshotPersonDay <n>`: the person view's selected bar, instead of today's.
     static var personDay: Int? {
         value(after: "-ScreenshotPersonDay").flatMap(Int.init)
@@ -59,6 +105,12 @@ enum ScreenshotFixture {
     /// note).
     static var personScrolledToEnd: Bool {
         ProcessInfo.processInfo.arguments.contains("-ScreenshotPersonEnd")
+    }
+
+    /// `-ScreenshotSheetEnd`: the relay sheets open scrolled to their end, so captures on the closed
+    /// iPhone Duo show their last lines (the notifications line).
+    static var sheetScrolledToEnd: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotSheetEnd")
     }
 
     /// `-ScreenshotConnect`: start Connect GitHub on launch, as a tap would, so captures can show
@@ -75,13 +127,96 @@ enum ScreenshotFixture {
         ProcessInfo.processInfo.arguments.contains("-ScreenshotShare")
     }
 
+    /// `-ScreenshotShareRecord`: tap the record card's Share a few seconds after launch, once the
+    /// board has loaded, so captures can show the share sheet with the card's image.
+    static var sharesRecord: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotShareRecord")
+    }
+
+    /// `-ScreenshotRivalLimit`: a person view's Rival explains the limit on appear when three rivals
+    /// are pinned, as tapping it would. Honored on any Debug launch.
+    static var explainsRivalLimit: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotRivalLimit")
+    }
+
+    /// `-ScreenshotNotifications`: Settings opens on the Notifications screen.
+    static var opensNotifications: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotNotifications")
+    }
+
+    /// `-ScreenshotNotificationsEnd`: the Notifications screen scrolls to Delivery (and Quiet hours
+    /// below it) once it loads, for captures of sections below the fold.
+    static var notificationsScrolledToEnd: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotNotificationsEnd")
+    }
+
+    /// `-ScreenshotNotificationsAboutYou`: the Notifications screen scrolls to About you once it loads.
+    static var notificationsScrolledToAboutYou: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotNotificationsAboutYou")
+    }
+
+    /// `-ScreenshotNotificationsDenied`: iOS's notification permission reads as denied.
+    static var notificationsDenied: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotNotificationsDenied")
+    }
+
+    /// `-ScreenshotNoRelay`: no Committed relay, even in a relay build.
+    static var withoutRelay: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotNoRelay")
+    }
+
+    /// The board owner's notification choices, in memory: the defaults, with `-ScreenshotPasses`,
+    /// `-ScreenshotCloseCalls` (Close calls on), `-ScreenshotResults off`, `-ScreenshotRecords off`,
+    /// `-ScreenshotStreakReminder` (Streak reminder on), `-ScreenshotDelivery immediate|summary` and
+    /// `-ScreenshotQuietHours <start>-<end>|off` applied.
+    static func notificationPreferences() -> InMemoryNotificationPreferences {
+        var choices = NotificationPreferences()
+        if let passes = value(after: "-ScreenshotPasses").flatMap(NotificationPreferences.Passes.init(rawValue:)) {
+            choices.passes = passes
+        }
+        if ProcessInfo.processInfo.arguments.contains("-ScreenshotCloseCalls") {
+            choices.closeCalls = true
+        }
+        if value(after: "-ScreenshotRecords") == "off" {
+            choices.records = false
+        }
+        if ProcessInfo.processInfo.arguments.contains("-ScreenshotStreakReminder") {
+            choices.streakReminder = true
+        }
+        if let hours = value(after: "-ScreenshotQuietHours") {
+            let ends = hours.split(separator: "-").map(String.init)
+            choices.quietHours = ends.count == 2 ? .init(start: ends[0], end: ends[1]) : nil
+        }
+        if value(after: "-ScreenshotResults") == "off" { choices.results = false }
+        if let delivery = value(after: "-ScreenshotDelivery").flatMap(NotificationPreferences.Delivery.init(rawValue:)) {
+            choices.delivery = delivery
+        }
+        return InMemoryNotificationPreferences([SampleServices.owner: choices])
+    }
+
     /// Live rank settings for the fixture, in memory: never chosen, or accepted and on with
-    /// `-RelayDisclosureAccepted`.
+    /// `-RelayDisclosureAccepted` (the earlier sheet, as 1.0.x saved it). Add
+    /// `-RelayNotificationsAccepted` to have agreed to relay notifications too. With Leaderboard
+    /// Notifications on (`-notifyOnPositionChange YES`), the earlier sheet alone shows "Get
+    /// notifications with Committed closed?".
     static func liveRankPreferences() -> InMemoryLiveRankPreferences {
-        guard ProcessInfo.processInfo.arguments.contains("-RelayDisclosureAccepted") else {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("-RelayDisclosureAccepted") else {
             return InMemoryLiveRankPreferences()
         }
-        return InMemoryLiveRankPreferences(LiveRankPreferences(isEnabled: true, relayDisclosureAccepted: true))
+        let notifications: Bool? = arguments.contains("-RelayNotificationsAccepted") ? true : nil
+        return InMemoryLiveRankPreferences(LiveRankPreferences(
+            isEnabled: true, relayDisclosureAccepted: true, relayNotifications: notifications
+        ))
+    }
+
+    /// `-ScreenshotCalendarFrom <login>=<YYYY-MM-DD>`: once the board loads, that person's calendar
+    /// starts on that day, as a new GitHub account's would, so their Weekly record has empty weeks.
+    /// The next refresh restores it.
+    static var calendarStart: (login: String, first: String)? {
+        guard let parts = value(after: "-ScreenshotCalendarFrom")?.split(separator: "="), parts.count == 2
+        else { return nil }
+        return (String(parts[0]), String(parts[1]))
     }
 
     private static func value(after flag: String) -> String? {
@@ -179,7 +314,8 @@ enum ScreenshotFixture {
     }
 
     /// The Sample board's services (`SampleServices`) with the fixture's extras: one person who
-    /// always fails to load, `-ScreenshotRestrictedOrg <name>` and `-ScreenshotHide <login>`. It
+    /// always fails to load, `-ScreenshotRestrictedOrg <name>`, `-ScreenshotHide <login>` and
+    /// `-ScreenshotPin <login,login>`. It
     /// loads at once, refreshing twice so Today shows movement chevrons.
     ///
     /// `extraPeople` adds that many followed people (`sample-pal-01`, …) below everyone else, for a
@@ -192,22 +328,33 @@ enum ScreenshotFixture {
             includesFailingCompetitor: failingCompetitor,
             restrictedOrganizations: value(after: "-ScreenshotRestrictedOrg").map { [$0] },
             trollPerson: value(after: "-ScreenshotTroll"),
-            countScale: value(after: "-ScreenshotCountScale").flatMap(Int.init).map { max(1, $0) } ?? 1
+            countScale: value(after: "-ScreenshotCountScale").flatMap(Int.init).map { max(1, $0) } ?? 1,
+            recordDay: value(after: "-ScreenshotRecordDay").flatMap(Int.init)
         ), now: now)
-        let hide = value(after: "-ScreenshotHide")
+        let hide = value(after: "-ScreenshotHide")?.split(separator: ",").map(String.init)
+        let pins = value(after: "-ScreenshotPin")?.split(separator: ",").map(String.init) ?? []
         // `-ScreenshotWindow monthly`: the board opens on that Window (a raw value).
         if let window = value(after: "-ScreenshotWindow").flatMap(ContributionWindow.init(rawValue:)) {
             services.store.selectedWindow = window
         }
         Task {
             await services.auth.refreshIdentity()
-            if let hide {
+            if hide != nil || !pins.isEmpty {
                 await services.roster.refresh(force: true)
-                services.store.setHidden(true, username: hide)
+            }
+            for login in hide ?? [] {
+                services.store.setHidden(true, username: login)
+            }
+            for login in pins {
+                services.store.setPinned(true, username: login)
             }
             // Two refreshes on the same day: the first sets today's baseline, the second moves.
             await services.refresh.refreshAll(reason: .manual)
             await services.refresh.refreshAll(reason: .timer)
+            if let start = calendarStart, var history = services.store.history(for: start.login) {
+                history.days = history.days.filter { $0.key >= start.first }
+                services.store.updateHistories([start.login: history])
+            }
         }
         return services
     }

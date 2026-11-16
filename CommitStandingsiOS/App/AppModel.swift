@@ -1,4 +1,5 @@
 import Foundation
+import UserNotifications
 import Observation
 
 /// The iPhone app's tabs. Each tab owns its own `NavigationStack`.
@@ -36,10 +37,17 @@ final class AppModel {
 
     var selectedTab: AppTab = .board
     /// The Competitor whose person view is open (pushed onto the Board, or the second pane on iPhone Duo), by
-    /// login; nil when none is. Forgotten when the graph on screen changes.
-    var selectedPerson: String?
+    /// login; nil when none is. Forgotten when the graph on screen changes. Closing it, or showing
+    /// someone else, drops a Challenge asked for them.
+    var selectedPerson: String? {
+        didSet { if selectedPerson != requestedChallenge { requestedChallenge = nil } }
+    }
     /// The switch in Settings asked for the relay disclosure.
     private var liveRankDisclosureRequested = false
+    /// A notification switch asked for the relay notifications sheet.
+    private var relayNotificationsConsentRequested = false
+    /// The switch turned on that's waiting for **Turn On** in that sheet.
+    private var pendingNotificationSwitch: PendingNotificationSwitch?
 
     /// The graph on screen: the real one, or the Sample board's.
     private(set) var services: CommittedServices
@@ -55,6 +63,15 @@ final class AppModel {
     /// The Home Screen and Lock Screen widgets' snapshot. One publisher for both graphs, so its
     /// de-duplication spans a switch.
     private let widgets: WidgetPublisher
+    /// Relay notification choices per GitHub account.
+    let notificationPreferences: any NotificationPreferencesStoring
+    /// Bumped on every saved choice, so the Notifications screen redraws (the store isn't observable).
+    private var notificationChoicesRevision = 0
+    /// iOS's notification permission for Committed, read when the Notifications screen shows.
+    private let notificationAuthorization: @Sendable () async -> UNAuthorizationStatus
+    /// Notifications for Committed are off in iOS Settings: the Notifications screen says so.
+    private(set) var notificationsDeniedInSettings = false
+    private let remoteNotifications: any RemoteNotificationRegistering
     private let now: @Sendable () -> Date
     private var didRefreshIdentity = false
     /// Where the real board's avatars are saved, for the app, Live rank and the widgets.
@@ -78,6 +95,13 @@ final class AppModel {
 
     /// Where the Sample board is remembered across launches (UserDefaults).
     nonisolated static let sampleBoardKey = "sampleBoard.v1"
+    /// Where dismissed record cards are remembered (UserDefaults), by GitHub account.
+    nonisolated static let dismissedRecordCardsKey = "recordCards.dismissed.v1"
+
+    /// Record cards dismissed on the real board, by GitHub account, newest last (`dismissRecordCard`).
+    private var dismissedRecordCards: [String: [String]]
+    /// The Sample board's, forgotten when it ends.
+    private var sampleDismissedRecordCards: [String: [String]] = [:]
 
     /// `services` is the real graph. `defaults` remembers the Sample board across launches; nil
     /// keeps it in memory (tests, previews, the screenshot fixture). The Live rank defaults never
@@ -94,12 +118,21 @@ final class AppModel {
         avatars: any AvatarPrefetching = NoAvatarPrefetching(),
         widgets: WidgetPublisher = WidgetPublisher(save: { _ in }, reload: {}),
         avatarCache: AvatarCache = .shared,
+        notificationPreferences: any NotificationPreferencesStoring = InMemoryNotificationPreferences(),
+        remoteNotifications: any RemoteNotificationRegistering = NoRemoteNotifications(),
+        notificationAuthorization: @escaping @Sendable () async -> UNAuthorizationStatus = {
+            await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        },
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.avatarCache = avatarCache
+        self.notificationPreferences = notificationPreferences
+        self.remoteNotifications = remoteNotifications
+        self.notificationAuthorization = notificationAuthorization
         self.realServices = services
         self.makeSampleServices = sampleServices
         self.defaults = defaults
+        self.dismissedRecordCards = defaults?.dictionary(forKey: Self.dismissedRecordCardsKey) as? [String: [String]] ?? [:]
         self.liveRankActivities = liveRankActivities
         self.backgroundTime = backgroundTime
         self.widgets = widgets
@@ -112,6 +145,11 @@ final class AppModel {
         self.services = services
         self.liveRank = realLiveRank
         wire(services, liveRank: realLiveRank, avatars: avatars)
+        // One source at a time: while the relay delivers notifications, the app posts no passes of
+        // its own, and none while relay notifications are on with Passes off.
+        services.notifications.isDeliveredByRelay = { [weak self, weak realLiveRank] in
+            (realLiveRank?.relayDeliversNotifications ?? false) || (self?.passesOffForTheRelay ?? false)
+        }
         // A successful Connect GitHub replaces the Sample board before the real board's first
         // refresh, so that refresh and its Live rank run on screen, as after any Connect GitHub.
         services.onSignedIn = { [weak self] in await self?.realAccountConnected() }
@@ -163,11 +201,15 @@ final class AppModel {
         }
         refresh.didRefresh = { [weak self, weak services] _ in
             await avatars.prefetch(store.visibleCompetitors.map(\.username))
+            // Before Live rank tells the relay the board, so a board with Live rank off isn't
+            // taken for "both off" before the notification choices are known.
+            if let self, let services, self.services === services { await self.syncRelayNotifications() }
             await liveRank.sync()
             if let self, let services, self.services === services { self.publishWidgets() }
         }
         services.onDisconnect = { [weak self, weak services] in
             liveRank.disconnected()
+            if let self, let services, self.services === services { self.forgetNotificationSwitchRequest() }
             if let self, let services, self.services === services { self.publishWidgets() }
         }
     }
@@ -202,6 +244,7 @@ final class AppModel {
         realServices.refresh.pauseTimer()
         services = sample
         selectedPerson = nil
+        sampleDismissedRecordCards = [:]
         liveRank = sampleLiveRank
         didRefreshIdentity = false
     }
@@ -234,6 +277,7 @@ final class AppModel {
         liveRank = realLiveRank
         didRefreshIdentity = false
         liveRankDisclosureRequested = false
+        forgetNotificationSwitchRequest()
         sampleBoardConnectError = nil
         selectedTab = .board
         realServices.refresh.resumeTimer()
@@ -289,6 +333,7 @@ final class AppModel {
     func sceneDidBecomeActive() async {
         isActive = true
         refresh.resumeTimer()
+        await syncRelayNotifications()
         // Ends strays from an earlier launch, and restarts Live rank if iOS ended it.
         await liveRank.enteredForeground()
         // Saved numbers reach the widgets now, before any refresh (and after an update from a
@@ -316,6 +361,7 @@ final class AppModel {
     /// Background app refresh: people and Contributions, then Live rank (update only; iOS doesn't
     /// let the app start one from the background).
     func backgroundRefresh() async {
+        await syncRelayNotifications()
         await liveRank.retryRelay()
         guard auth.isSignedIn else { return }
         await refresh.refreshAll(reason: .background)
@@ -346,12 +392,20 @@ final class AppModel {
 
     func acceptLiveRankDisclosure() async {
         liveRankDisclosureRequested = false
+        let pending = takeNotificationSwitchRequest()
         await liveRank.acceptRelayDisclosure()
+        // The sheet also agreed to relay notifications: with a switch on, they start now.
+        if let pending {
+            await commit(pending)
+        } else {
+            await syncRelayNotifications()
+        }
         await refreshLiveRankIfStale()
     }
 
     func declineLiveRankDisclosure() async {
         liveRankDisclosureRequested = false
+        forgetNotificationSwitchRequest()
         await liveRank.declineRelayDisclosure()
     }
 
@@ -366,9 +420,301 @@ final class AppModel {
         await refreshLiveRankIfStale()
     }
 
+    // MARK: - Relay notifications
+
+    /// Relay notifications are on (the "any switch" gate): a connected real board in a relay build,
+    /// agreed to in a relay sheet, notifications turned on with iOS's permission, and at least one
+    /// kind on (Passes, or any other switch on the Notifications screen). With Passes off the relay
+    /// hears `passes: "off"`; only with every kind off does it hear notifications off. Otherwise the
+    /// app's own (in-app) crossing notifications carry on as before; the Sample board never uses
+    /// the relay.
+    var relayNotificationsOn: Bool {
+        relayNotificationsAllowed && savedNotificationChoices.anyKindOn
+    }
+
+    /// Everything relay notifications need but a kind turned on.
+    private var relayNotificationsAllowed: Bool {
+        mode == .connected && liveRank.isRelayConfigured && liveRank.relayNotificationsChoice == true
+            && notificationsTurnedOn
+    }
+
+    /// A notification switch has been turned on with iOS's permission granted: the flag that was
+    /// Leaderboard Notifications. In a relay build it stays on while Passes is off, and the
+    /// Notifications screen's switches read off until it's on. (It isn't observable on its own;
+    /// every change here bumps `notificationChoicesRevision`.)
+    private var notificationsTurnedOn: Bool {
+        _ = notificationChoicesRevision
+        return services.notifications.isEnabled
+    }
+
+    /// The real board's relay choices have Passes off: the app posts no passes of its own either.
+    private var passesOffForTheRelay: Bool {
+        services === realServices && showsRelayNotificationChoices && savedNotificationChoices.passes == .off
+    }
+
+    /// "Get notifications with Committed closed?": shown once, unasked, the first time relay
+    /// notifications would turn on for someone who hasn't agreed to them (for example after
+    /// accepting the earlier relay sheet), and whenever a switch is turned on before agreeing (and
+    /// after **Not Now**). Never over the relay sheet, which covers notifications itself.
+    var isShowingRelayNotificationsConsent: Bool {
+        get {
+            guard mode == .connected, !needsConnect, liveRank.isRelayConfigured, !isShowingLiveRankDisclosure,
+                  liveRank.relayNotificationsChoice != true else { return false }
+            if relayNotificationsConsentRequested { return true }
+            return liveRank.relayNotificationsChoice == nil && notificationsTurnedOn && savedNotificationChoices.anyKindOn
+        }
+        set {
+            if !newValue { forgetNotificationSwitchRequest() }
+        }
+    }
+
+    /// The Passes switch (formerly Leaderboard Notifications). On, it takes the shared step every
+    /// switch takes (`setNotificationChoice`). Off, with the relay's choices, it sends
+    /// `passes: "off"` and leaves the other kinds on; without them it turns the in-app
+    /// notifications off, as it always has.
+    func leaderboardNotificationsChanged(_ enabled: Bool) async {
+        if enabled {
+            await notificationSwitchTurnedOn(isPasses: true) { choices in
+                // Back on about the same people (Everyone or Pinned rivals) as before it went off.
+                if choices.passes == .off { choices.turnPassesOn() }
+            }
+            return
+        }
+        if showsRelayNotificationChoices && notificationsTurnedOn {
+            await updateNotificationChoices { $0.passes = .off }
+            return
+        }
+        await services.notifications.setEnabled(false)
+        forgetNotificationSwitchRequest()
+        notificationChoicesRevision += 1
+        await syncRelayNotifications()
+    }
+
+    /// The Passes switch as the Notifications screen shows it.
+    var passesOn: Bool {
+        guard notificationsTurnedOn else { return false }
+        return !showsRelayNotificationChoices || savedNotificationChoices.passes != .off
+    }
+
+    /// Settings' Notifications row: On while any notification is.
+    var notificationsOn: Bool {
+        guard notificationsTurnedOn else { return false }
+        return !showsRelayNotificationChoices || savedNotificationChoices.anyKindOn
+    }
+
+    /// A switch turned on, waiting for the relay notifications sheet.
+    private struct PendingNotificationSwitch {
+        /// Notifications weren't on yet: the choices become the defaults, with this switch on.
+        var isFirst: Bool
+        var turnOn: (inout NotificationPreferences) -> Void
+    }
+
+    /// A notification switch is being turned on (waiting for iOS's prompt). Switches wait for it.
+    private(set) var isTurningOnNotifications = false
+
+    /// The one step every notification switch takes when it's turned on (#130's gate): iOS's
+    /// permission prompt the first time, then the relay notifications sheet unless already agreed
+    /// to. On success, the first time, the choices become the spec defaults (passes for everyone,
+    /// results and records on, delivery summary, quiet hours 10 PM to 8 AM; the Window stays) with
+    /// the tapped switch on. Denied permission, **Not Now** or dismissing the sheet leave
+    /// everything as it was, except that Passes keeps today's in-app notifications after **Not
+    /// Now**.
+    private func notificationSwitchTurnedOn(
+        isPasses: Bool, _ turnOn: @escaping (inout NotificationPreferences) -> Void
+    ) async {
+        guard !isTurningOnNotifications else { return }
+        isTurningOnNotifications = true
+        defer { isTurningOnNotifications = false }
+        let pending = PendingNotificationSwitch(isFirst: !notificationsTurnedOn, turnOn: turnOn)
+        if pending.isFirst {
+            // Passes, as Leaderboard Notifications did, is on at once (in the app) and goes back off
+            // if denied. Any other switch only asks: nothing is saved before it's agreed to.
+            let granted: Bool
+            if isPasses {
+                granted = await services.notifications.setEnabled(true)
+            } else {
+                granted = await services.notifications.requestAuthorization()
+            }
+            notificationChoicesRevision += 1
+            guard granted else {
+                await checkNotificationPermission()
+                return
+            }
+        }
+        if mode == .connected, liveRank.isRelayConfigured, liveRank.relayNotificationsChoice != true {
+            pendingNotificationSwitch = pending
+            relayNotificationsConsentRequested = true
+            await syncRelayNotifications()
+            return
+        }
+        await commit(pending)
+    }
+
+    /// Turns notifications on with this switch, saved for this account, and tells the relay.
+    private func commit(_ pending: PendingNotificationSwitch) async {
+        services.notifications.markEnabled()
+        if mode == .connected, let owner = store.selfCompetitor?.username {
+            var choices = notificationPreferences.load(account: owner)
+            if pending.isFirst { choices = choices.turnedOnDefaults }
+            pending.turnOn(&choices)
+            notificationPreferences.save(choices, account: owner)
+        }
+        notificationChoicesRevision += 1
+        await syncRelayNotifications()
+    }
+
+    private func takeNotificationSwitchRequest() -> PendingNotificationSwitch? {
+        defer { pendingNotificationSwitch = nil }
+        relayNotificationsConsentRequested = false
+        return pendingNotificationSwitch
+    }
+
+    private func forgetNotificationSwitchRequest() {
+        relayNotificationsConsentRequested = false
+        pendingNotificationSwitch = nil
+    }
+
+    /// **Turn On**: relay notifications start, with the switch that asked; Live rank stays as it is.
+    func acceptRelayNotifications() async {
+        let pending = takeNotificationSwitchRequest()
+        liveRank.setRelayNotificationsChoice(true)
+        if let pending {
+            await commit(pending)
+        } else {
+            await syncRelayNotifications()
+        }
+        await liveRank.sync()
+    }
+
+    /// **Not Now**: the in-app notifications carry on.
+    func declineRelayNotifications() async {
+        forgetNotificationSwitchRequest()
+        liveRank.setRelayNotificationsChoice(false)
+        notificationChoicesRevision += 1
+        await syncRelayNotifications()
+    }
+
+    /// Tells the relay the notification choices: this account's, or off. Only the real graph's
+    /// relay hears; while the board's owner isn't known yet (a cold launch), it waits rather than
+    /// say off.
+    func syncRelayNotifications() async {
+        guard services === realServices else { return }
+        guard relayNotificationsAllowed else {
+            await realLiveRank.relayNotificationsDidChange(nil)
+            return
+        }
+        guard let owner = store.selfCompetitor?.username else { return }
+        let choices = notificationPreferences.load(account: owner)
+        guard choices.anyKindOn else {
+            await realLiveRank.relayNotificationsDidChange(nil)
+            return
+        }
+        remoteNotifications.register()
+        await realLiveRank.relayNotificationsDidChange(RelayNotificationsConfiguration(
+            preferences: choices,
+            rivals: store.pinnedRivals.map(\.username)
+        ))
+    }
+
+    // MARK: - Notifications screen
+
+    /// Whether the Notifications screen shows the relay's choices (Everyone or Pinned rivals,
+    /// Window, Quiet hours and the sections later tickets add) or only Passes, which then work as
+    /// they always have: in the app, while it's open. Only Passes in a build without the relay, on
+    /// the Sample board, and after **Not Now** (until Passes is turned off and on, which asks again).
+    var showsRelayNotificationChoices: Bool {
+        mode == .connected && liveRank.isRelayConfigured && liveRank.relayNotificationsChoice != false
+    }
+
+    /// This account's saved choices (defaults until one is saved, and on the Sample board).
+    private var savedNotificationChoices: NotificationPreferences {
+        _ = notificationChoicesRevision
+        guard mode == .connected, let owner = store.selfCompetitor?.username else { return NotificationPreferences() }
+        return notificationPreferences.load(account: owner)
+    }
+
+    /// This account's notification choices as the Notifications screen shows them: until a switch
+    /// has been turned on, every kind reads off.
+    var notificationChoices: NotificationPreferences {
+        var choices = savedNotificationChoices
+        if showsRelayNotificationChoices && !notificationsTurnedOn { choices.turnEveryKindOff() }
+        return choices
+    }
+
+    /// Changes a notification choice: saved on this iPhone for this GitHub account, and sent to the
+    /// relay right away. Nothing is saved on the Sample board or before the board's owner is known.
+    func updateNotificationChoices(_ change: (inout NotificationPreferences) -> Void) async {
+        guard mode == .connected, let owner = store.selfCompetitor?.username else { return }
+        var choices = notificationPreferences.load(account: owner)
+        change(&choices)
+        notificationPreferences.save(choices, account: owner)
+        notificationChoicesRevision += 1
+        await syncRelayNotifications()
+    }
+
+    /// Every row on the Notifications screen goes through here (`notificationChoice`). A switch
+    /// turned on (any `Bool` choice: each is a kind of notification) takes the shared step that
+    /// asks for permission and relay consent; anything else is saved and sent right away.
+    func setNotificationChoice<Value>(_ keyPath: WritableKeyPath<NotificationPreferences, Value>, _ value: Value) async {
+        if let on = value as? Bool, on, let kind = keyPath as? WritableKeyPath<NotificationPreferences, Bool> {
+            await notificationSwitchTurnedOn(isPasses: false) { $0[keyPath: kind] = true }
+            return
+        }
+        await updateNotificationChoices { $0[keyPath: keyPath] = value }
+    }
+
+    /// Quiet hours' switch. Back on, they're the default 10 PM to 8 AM.
+    func setQuietHoursOn(_ on: Bool) async {
+        await updateNotificationChoices { $0.quietHours = on ? NotificationPreferences().quietHours : nil }
+    }
+
+    /// Rival in someone's person view: pins or unpins them (see `StandingsStore.setPinned`) and
+    /// tells the relay the new rivals. False when nothing changed.
+    @discardableResult
+    func setRivalPinned(_ pinned: Bool, username: String) async -> Bool {
+        guard store.setPinned(pinned, username: username) else { return false }
+        await syncRelayNotifications()
+        return true
+    }
+
+    /// Reads iOS's permission, for the Notifications screen's "off in iOS Settings" state.
+    func checkNotificationPermission() async {
+        notificationsDeniedInSettings = await notificationAuthorization() == .denied
+    }
+
     /// Opens `login`'s person view, as tapping their row on the Board does.
     func showPerson(_ login: String) {
         selectedPerson = login
+    }
+
+    // MARK: - Challenge
+
+    /// Someone whose Challenge share should open by itself once their race has loaded: asked for
+    /// from outside the person view (a pass notification's Share your race, #137).
+    private(set) var requestedChallenge: String?
+
+    /// Challenge for `person`'s view: your 30-day race with them. nil on your own view, until both
+    /// your counts have loaded, and on the Sample board, whose people are made up.
+    func challenge(for person: PersonSummary) -> Challenge? {
+        guard mode == .connected, let you = store.selfCompetitor?.username else { return nil }
+        return Challenge(you: you, person: person)
+    }
+
+    /// Opens `login`'s view on the Board and presents their Challenge share as soon as their race
+    /// has loaded, as tapping Challenge would. Nothing opens on the Sample board.
+    func requestChallenge(_ login: String) {
+        selectedTab = .board
+        showPerson(login)
+        requestedChallenge = mode == .connected ? login : nil
+    }
+
+    /// The Challenge asked for with `requestChallenge`, once, when `person` is the one asked for
+    /// and their race has loaded; nil until then.
+    func takeRequestedChallenge(for person: PersonSummary) -> Challenge? {
+        guard requestedChallenge == person.login, selectedPerson == person.login,
+              let challenge = challenge(for: person) else { return nil }
+        requestedChallenge = nil
+        return challenge
     }
 
     /// The open person view's content as of now, or nil: nobody chosen, or they've left the board
@@ -377,9 +723,59 @@ final class AppModel {
         selectedPerson.flatMap { store.person($0, asOf: now(), calendar: .current) }
     }
 
-    /// Hiding or showing someone updates Live rank and the widgets right away while the app is open.
+    /// Your rivals on the Board, from `ranked` (the selected Window's board), with your weekly
+    /// records as of the app's clock, the same date the person view uses.
+    func yourRivals(ranked: [Ranking.Entry]) -> [YourRivals.Row] {
+        YourRivals.rows(ranked: ranked, store: store, asOf: now())
+    }
+
+    // MARK: - Your records
+
+    /// Your records as of now, against the people on the board: nil until your calendar loads.
+    var yourRecords: PersonalRecords? {
+        store.records(asOf: now())
+    }
+
+    /// The Board's record card: a record you broke today that's worth celebrating and that you
+    /// haven't dismissed. It goes by itself when the day ends.
+    var recordCard: PersonalRecords.Broken? {
+        guard let me = store.selfCompetitor?.username else { return nil }
+        return yourRecords?.card(dismissed: Set(dismissed(for: me)))
+    }
+
+    /// Hides the record card for this record, on this account. Saved on the real board; the Sample
+    /// board's are forgotten when it ends.
+    func dismissRecordCard(_ record: PersonalRecords.Broken) {
+        guard let me = store.selfCompetitor?.username else { return }
+        // A card lasts a day, so a few recent ids are all that's ever needed.
+        let kept = Array((dismissed(for: me).filter { $0 != record.id } + [record.id]).suffix(12))
+        if mode == .sampleBoard {
+            sampleDismissedRecordCards[me] = kept
+        } else {
+            dismissedRecordCards[me] = kept
+            defaults?.set(dismissedRecordCards, forKey: Self.dismissedRecordCardsKey)
+        }
+    }
+
+    private func dismissed(for login: String) -> [String] {
+        (mode == .sampleBoard ? sampleDismissedRecordCards : dismissedRecordCards)[login] ?? []
+    }
+
+    /// See your records: your own view, on the Board.
+    func showYourRecords() {
+        guard let me = store.selfCompetitor?.username else { return }
+        selectedTab = .board
+        showPerson(me)
+    }
+
+    /// Hiding or showing someone updates Live rank, the relay's rivals (hiding unpins) and the
+    /// widgets right away while the app is open.
     func visibilityDidChange() async {
+        // Live rank first: its new board already leaves a hidden rival out of `rivals` (the
+        // registrar keeps only rivals on the board), so the notification sync after it sends the
+        // same body and the relay hears one write, not two.
         await liveRank.sync()
+        await syncRelayNotifications()
         publishWidgets()
     }
 
@@ -472,15 +868,32 @@ final class AppModel {
 
     // MARK: - Deep links
 
-    /// `committed://board?window=…` opens the Board on that Window. Returns whether it handled the URL.
+    /// `committed://board?window=…` opens the Board on that Window; `committed://person/<login>` opens
+    /// that person's view on the Board, or just the Board when they're not on it (hidden, or gone);
+    /// `committed://challenge/<login>` does the same and presents their Challenge share once their
+    /// race loads (a pass notification's Share your race). Returns whether it handled the URL.
     @discardableResult
     func open(_ url: URL) -> Bool {
         guard let link = DeepLink(url: url) else { return false }
+        open(link)
+        return true
+    }
+
+    func open(_ link: DeepLink) {
         switch link {
         case .board(let window):
             selectedTab = .board
             if let window { store.selectedWindow = window }
+        case .person(let login):
+            selectedTab = .board
+            selectedPerson = isOnBoard(login) ? login : nil
+        case .challenge(let login):
+            guard isOnBoard(login) else { return open(.person(login: login)) }
+            requestChallenge(login)
         }
-        return true
+    }
+
+    private func isOnBoard(_ login: String) -> Bool {
+        store.visibleCompetitors.contains { $0.username == login }
     }
 }

@@ -1,8 +1,11 @@
 import SwiftUI
+import UserNotifications
 import UIKit
 
 @main
 struct CommittedApp: App {
+    /// Only for the remote-notification token (relay notifications).
+    @UIApplicationDelegateAdaptor(CommittedAppDelegate.self) private var appDelegate
     // The same shared graph as the Mac app: saved standings and people show immediately on
     // launch, and the token lives in this iPhone's Keychain.
     @State private var model = CommittedApp.makeModel()
@@ -27,13 +30,26 @@ struct CommittedApp: App {
                 services: ScreenshotFixture.services(), backgroundTime: UIApplicationBackgroundTime(),
                 liveRankActivities: ScreenshotFixture.liveRankActivities(ActivityKitLiveRankActivities()),
                 liveRankPreferences: ScreenshotFixture.liveRankPreferences(),
-                liveRankRelay: makeLiveRankRelay(),
+                liveRankRelay: ScreenshotFixture.withoutRelay ? NoLiveRankRelay() : makeLiveRankRelay(),
                 avatars: ScreenshotFixture.avatars(),
                 widgets: WidgetPublisher(),
+                notificationPreferences: ScreenshotFixture.notificationPreferences(),
+                notificationAuthorization: { [denied = ScreenshotFixture.notificationsDenied] in
+                    denied ? .denied : await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+                },
                 now: ScreenshotFixture.now
             )
             if let tab = ScreenshotFixture.requestedTab { model.selectedTab = tab }
             model.selectedPerson = ScreenshotFixture.requestedPerson
+            if let login = ScreenshotFixture.requestedChallenge { model.requestChallenge(login) }
+            if let link = ScreenshotFixture.notificationResponse {
+                // The fixture starts with nobody saved, where a real cold launch has last time's
+                // people; the response arrives once they've loaded.
+                Task {
+                    await model.roster.refresh(force: true)
+                    ForegroundNotificationPresenter.receive(link)
+                }
+            }
             return model
         }
         #endif
@@ -52,7 +68,10 @@ struct CommittedApp: App {
             liveRankPreferences: UserDefaultsLiveRankPreferences(),
             liveRankRelay: makeLiveRankRelay(),
             avatars: GitHubAvatarPrefetcher.live(),
-            widgets: WidgetPublisher()
+            widgets: WidgetPublisher(),
+            notificationPreferences: UserDefaultsNotificationPreferences(),
+            remoteNotifications: LiveRankRelaySettings.main.baseURL == nil
+                ? NoRemoteNotifications() : UIApplicationRemoteNotifications()
         )
         #if DEBUG
         if let tab = ScreenshotFixture.requestedTab { model.selectedTab = tab }
@@ -78,6 +97,8 @@ struct CommittedApp: App {
         let tokens = ActivityKitLiveRankTokens(receiver: registrar)
         tokens.start()
         liveRankTokens = tokens
+        // The alert token for relay notifications comes through the app delegate.
+        CommittedAppDelegate.alertTokens = registrar
         LiveRankLog.relay.info("relay \(baseURL.absoluteString, privacy: .public), \(settings.apnsEnvironment.rawValue, privacy: .public)")
         return registrar
     }

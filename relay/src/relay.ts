@@ -3,7 +3,10 @@ import { boardError, competitorsOf, loginData, readBoard, type LoginData } from 
 import { Store, type InstallationRow, type Registration } from "./db";
 import { runCycle } from "./cycle";
 import { boardState, parseBoardQuery } from "./publicBoard";
+import { parseRaceQuery, raceState } from "./race";
 import type { LiveRankState } from "./liveRank";
+import { stateOnRegistration } from "./notifications";
+import { parsePreferences, type NotificationPreferences } from "./notifications/preferences";
 import { isValidTimeZone } from "./parser";
 import { selfFirst, WINDOWS, type Window } from "./ranking";
 import { widgetResponse } from "./widget";
@@ -44,6 +47,8 @@ const HEX_TOKEN = /^[0-9a-f]{16,512}$/;
 // GitHub logins: alphanumerics and single hyphens, 1–39 chars (UsernameNormalization in Swift).
 const LOGIN_PATTERN = /^[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){0,38}$/;
 
+const PUBLIC_CORS = { "access-control-allow-origin": "*" };
+
 export const defaultLog: Log = (event, fields = {}) => {
   console.log(JSON.stringify({ event, ...fields }));
 };
@@ -56,6 +61,7 @@ export function createRelay(deps: RelayDeps) {
     const url = new URL(request.url);
     if (url.pathname === "/" && request.method === "GET") return text(200, "Committed relay");
     if (url.pathname === "/v1/board") return board(request, url);
+    if (url.pathname === "/v1/race") return race(request, url);
 
     const widget = widgetResponse(request, url);
     if (widget) return widget;
@@ -99,6 +105,18 @@ export function createRelay(deps: RelayDeps) {
 
     const registration = parseRegistration(body);
     if (typeof registration === "string") return json(400, { error: registration });
+    // An installation exists while Live rank or relay notifications is on.
+    if (!registration.liveRank && registration.notifications === null) {
+      if (!existing) return new Response(null, { status: 204 });
+      await endActivity(existing);
+      await store.delete(id);
+      log("installation_deleted", { id, reason: "both_off" });
+      return new Response(null, { status: 204 });
+    }
+    if (existing && existing.live_rank && !registration.liveRank) {
+      // Live rank turned off: end its activity now; the cycle won't touch it again.
+      await endActivity(existing);
+    }
     if (!existing) {
       await store.create(id, secretHash, registration, deps.now());
       log("installation_created", { id, competitors: registration.competitors.length });
@@ -108,6 +126,8 @@ export function createRelay(deps: RelayDeps) {
     // as a visibility change does in RefreshCoordinator.
     const resetBaseline = existing.competitors_json !== JSON.stringify(registration.competitors);
     await store.update(id, registration, resetBaseline, deps.now());
+    const state = stateOnRegistration(existing, registration.notifications, registration.timeZone, deps.now());
+    if (state !== null) await store.saveNotificationState(id, state);
     log("installation_updated", { id, competitors: registration.competitors.length });
     return json(200, { ok: true });
   }
@@ -138,22 +158,47 @@ export function createRelay(deps: RelayDeps) {
     return Response.json(board, { headers: { "cache-control": "private, max-age=60", vary: "Authorization" } });
   }
 
-  /** Public read for the NZXT Kraken LCD page. Any origin may read it: it serves public counts only. */
-  async function board(request: Request, url: URL): Promise<Response> {
-    const cors = { "access-control-allow-origin": "*" };
+  /**
+   * The checks every public read shares: GET only, readable from any origin (they serve public
+   * counts only), rate limited per IP. A response to return as is, or null to go on.
+   */
+  async function publicReadGate(request: Request, limiterKey: (ip: string) => string): Promise<Response | null> {
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: { ...cors, "access-control-allow-methods": "GET" } });
+      return new Response(null, { status: 204, headers: { ...PUBLIC_CORS, "access-control-allow-methods": "GET" } });
     }
-    if (request.method !== "GET") return json(405, { error: "method_not_allowed" }, cors);
+    if (request.method !== "GET") return json(405, { error: "method_not_allowed" }, PUBLIC_CORS);
     if (deps.boardLimiter) {
       const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
-      if (!(await deps.boardLimiter.limit({ key: ip })).success) return json(429, { error: "rate_limited" }, cors);
+      if (!(await deps.boardLimiter.limit({ key: limiterKey(ip) })).success) {
+        return json(429, { error: "rate_limited" }, PUBLIC_CORS);
+      }
     }
+    return null;
+  }
+
+  /** Public read for the NZXT Kraken LCD page. */
+  async function board(request: Request, url: URL): Promise<Response> {
+    const gate = await publicReadGate(request, (ip) => ip);
+    if (gate) return gate;
     const query = parseBoardQuery(url.searchParams, normalizeLogin);
-    if (typeof query === "string") return json(400, { error: query }, cors);
+    if (typeof query === "string") return json(400, { error: query }, PUBLIC_CORS);
     const state = await boardState(query, { store, github: deps.github, log, now: deps.now() });
     log("board_read", { competitors: query.competitors.length });
-    return json(200, state, { ...cors, "cache-control": "public, max-age=60" });
+    return json(200, state, { ...PUBLIC_CORS, "cache-control": "public, max-age=60" });
+  }
+
+  /** Public read for the challenge page (gitcommitted.app/vs/<login>/<rival>). */
+  async function race(request: Request, url: URL): Promise<Response> {
+    // Its own budget per IP, so challenge pages and the Kraken page don't use up each other's.
+    const gate = await publicReadGate(request, (ip) => `race:${ip}`);
+    if (gate) return gate;
+    const query = parseRaceQuery(url.searchParams, normalizeLogin);
+    if (typeof query === "string") return json(400, { error: query }, PUBLIC_CORS);
+    const state = await raceState(query, { store, github: deps.github, log, now: deps.now() });
+    log("race_read", { found: state !== null });
+    // Not cached publicly: a login that's new to GitHub, or a GitHub outage, should clear up on the next read.
+    if (!state) return json(404, { error: "unknown_login" }, PUBLIC_CORS);
+    return json(200, state, { ...PUBLIC_CORS, "cache-control": "public, max-age=60" });
   }
 
   async function allowWrite(row: InstallationRow): Promise<boolean> {
@@ -206,7 +251,12 @@ export function placeholderState(row: InstallationRow, now: number): LiveRankSta
 
 // MARK: - Validation
 
-const REGISTRATION_KEYS = new Set(["pushToStartToken", "login", "competitors", "window", "timeZone", "apnsEnvironment"]);
+const REGISTRATION_KEYS = new Set([
+  "pushToStartToken", "login", "competitors", "window", "timeZone", "apnsEnvironment",
+  // Spec #124. Optional: the 1.0.x apps send none of them.
+  "liveRank", "alertToken", "notifications", "rivals",
+]);
+export const MAX_RIVALS = 3;
 const ACTIVITY_KEYS = new Set(["activityId", "pushToken"]);
 
 /** Returns the registration, or an error code. Unknown keys are rejected so a GitHub token can't be accepted. */
@@ -231,13 +281,36 @@ function parseRegistration(body: unknown): Registration | string {
   if (typeof body.timeZone !== "string" || !isValidTimeZone(body.timeZone)) return "invalid_time_zone";
   if (body.apnsEnvironment !== "sandbox" && body.apnsEnvironment !== "production") return "invalid_apns_environment";
 
+  const liveRank = body.liveRank ?? true;
+  if (typeof liveRank !== "boolean") return "invalid_live_rank";
+  const alertToken = body.alertToken ?? null;
+  if (alertToken !== null && !(typeof alertToken === "string" && HEX_TOKEN.test(alertToken))) return "invalid_alert_token";
+  let notifications: NotificationPreferences | null = null;
+  if (body.notifications !== undefined && body.notifications !== null) {
+    const parsed = parsePreferences(body.notifications);
+    if (typeof parsed === "string") return parsed;
+    notifications = parsed;
+  }
+  const rawRivals = body.rivals ?? [];
+  if (!Array.isArray(rawRivals)) return "invalid_rivals";
+  const rivals = rawRivals.map(normalizeLogin);
+  if (rivals.some((rival) => rival === null)) return "invalid_rivals";
+  const uniqueRivals = [...new Set(rivals as string[])];
+  if (uniqueRivals.length > MAX_RIVALS) return "too_many_rivals";
+  if (uniqueRivals.some((rival) => rival === login || !competitors.includes(rival))) return "unknown_rival";
+
   return {
-    pushToStartToken: pushToStartToken as string | null,
+    // Live rank's tokens only while it's on, the alert token only while notifications are.
+    pushToStartToken: liveRank ? (pushToStartToken as string | null) : null,
     login,
     competitors,
     window: body.window as Window,
     timeZone: body.timeZone,
     apnsEnvironment: body.apnsEnvironment as ApnsEnvironment,
+    liveRank,
+    alertToken: notifications ? (alertToken as string | null) : null,
+    notifications,
+    rivals: uniqueRivals,
   };
 }
 

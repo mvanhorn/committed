@@ -384,12 +384,15 @@ describe("rotation", () => {
     await relay.runCycle();
     expect(apns.events()).toEqual([`start:${PTS}`]);
 
+    // Just short of 7.5 hours after that start: nothing. At 7.5 hours: once more. Two cycles on
+    // the boundary rather than a cycle every half hour, which was slow enough to time out under load.
     apns.clear();
-    for (let i = 0; i < 16; i++) {
-      clock.advance(30 * MINUTE);
-      await relay.runCycle();
-    }
-    expect(apns.events()).toEqual([`start:${PTS}`]); // once more, 7.5 hours after the last start
+    clock.advance(7 * HOUR + 25 * MINUTE);
+    await relay.runCycle();
+    expect(apns.events()).toEqual([]);
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.events()).toEqual([`start:${PTS}`]);
   });
 
   it("does nothing without any token", async () => {
@@ -491,6 +494,34 @@ describe("logging", () => {
     for (const secret of [PTS, ACTIVITY, SECRET]) expect(all).not.toContain(secret);
   });
 
+  it("never logs the alert token", async () => {
+    const lines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(" "));
+    });
+    relay = createRelay({ db: env.DB, apns, github: github.fetch, githubName: github.name, now: clock.now, bundleId: BUNDLE });
+    const alert = "9f".repeat(32);
+    github.set("me", { "2026-11-05": 5 });
+    github.set("alice", { "2026-11-05": 3 });
+    await put(`/v1/installations/${ID}`, {
+      pushToStartToken: null, login: "me", competitors: ["me", "alice"], window: "daily", timeZone: "America/New_York",
+      apnsEnvironment: "sandbox", liveRank: false, alertToken: alert, notifications: {},
+    });
+    await relay.runCycle();
+    github.set("alice", { "2026-11-05": 9 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    apns.respond(alert, { status: 400, reason: "BadDeviceToken" });
+    github.set("me", { "2026-11-05": 10 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+
+    const all = lines.join("\n");
+    expect(all).toContain("alert_sent");
+    expect(all).toContain("token_cleared");
+    expect(all).not.toContain(alert);
+  });
+
   it("names each push line push_sent or push_failed, with the APNs event beside it", async () => {
     const lines: string[] = [];
     vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
@@ -516,5 +547,376 @@ describe("logging", () => {
       ["push_sent", "update"],
       ["push_failed", "update"],
     ]);
+  });
+});
+
+describe("relay notifications: passes", () => {
+  const ALERT = "ab".repeat(32);
+  const NOTIFICATIONS = { window: "daily", passes: "everyone" };
+
+  async function registerNotifications(
+    overrides: Partial<{
+      liveRank: boolean;
+      alertToken: string | null;
+      notifications: unknown;
+      competitors: string[];
+      rivals: string[];
+    }> = {},
+  ) {
+    await register(ID, { pushToStartToken: null });
+    await put(`/v1/installations/${ID}`, {
+      pushToStartToken: null,
+      login: "me",
+      competitors: ["me", "alice", "bob"],
+      window: "daily",
+      timeZone: "America/New_York",
+      apnsEnvironment: "production",
+      liveRank: false,
+      alertToken: ALERT,
+      notifications: NOTIFICATIONS,
+      ...overrides,
+    });
+  }
+
+  async function storedRow() {
+    return env.DB.prepare("SELECT * FROM installations WHERE id = ?").bind(ID).first<Record<string, unknown>>();
+  }
+
+  beforeEach(() => {
+    github.set("me", { "2026-11-05": 5 });
+    github.set("alice", { "2026-11-05": 3 });
+    github.set("bob", { "2026-11-05": 9 });
+  });
+
+  it("sends the shipped copy as a PASS alert, once per crossing", async () => {
+    await registerNotifications();
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(0); // the first look is a baseline
+
+    github.set("alice", { "2026-11-05": 7 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(1);
+    const push = apns.alerts[0]!;
+    expect(push.token).toBe(ALERT);
+    expect(push.environment).toBe("production");
+    expect(push.priority).toBe(10);
+    // No collapse id: each crossing is its own notification, none replaces another (spec #124).
+    expect(push.collapseId).toBeUndefined();
+    expect(push.payload).toEqual({
+      aps: {
+        alert: { title: "😤 alice passed you", body: "They're ahead 7–5. Time to catch up!" },
+        sound: "default",
+        category: "PASS",
+        "thread-id": "passes",
+      },
+      kind: "pass",
+      login: "alice",
+    });
+
+    // Still ahead five minutes later: no second notification.
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(1);
+
+    // You pass bob, and alice again.
+    github.set("me", { "2026-11-05": 12 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts.slice(1).map((alert) => alert.payload.aps.alert)).toEqual([
+      { title: "🎉 You passed alice!", body: "You're ahead 12–7. Keep climbing!" },
+      { title: "🎉 You passed bob!", body: "You're ahead 12–9. Keep climbing!" },
+    ]);
+  });
+
+  it("doesn't fire when someone only ties you", async () => {
+    await registerNotifications();
+    await relay.runCycle();
+    github.set("alice", { "2026-11-05": 5 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    github.set("me", { "2026-11-05": 6 });
+    github.set("alice", { "2026-11-05": 6 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(0);
+  });
+
+  it("leaves out people you've hidden", async () => {
+    // bob is hidden: the app leaves him out of the board it registers.
+    await registerNotifications({ competitors: ["me", "alice"] });
+    await relay.runCycle();
+    github.set("me", { "2026-11-05": 20 }); // passes bob's 9, but bob isn't on the board
+    github.set("alice", { "2026-11-05": 25 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts.map((alert) => alert.payload.login)).toEqual(["alice"]);
+  });
+
+  it("judges passes on the chosen Window", async () => {
+    github.set("me", { "2026-11-04": 10, "2026-11-05": 5 });
+    github.set("alice", { "2026-11-04": 0, "2026-11-05": 8 });
+    await registerNotifications({ notifications: { window: "weekly" } });
+    await relay.runCycle();
+    // Today alice is ahead (8–5), but over 7 days you are (15–8): nothing passed.
+    github.set("alice", { "2026-11-04": 0, "2026-11-05": 9 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(0);
+
+    github.set("alice", { "2026-11-04": 0, "2026-11-05": 16 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts.map((alert) => alert.payload.aps.alert.body)).toEqual(["They're ahead 16–15. Time to catch up!"]);
+  });
+
+  it("takes a fresh baseline at local midnight instead of reporting Today's reset", async () => {
+    clock.seconds = Date.UTC(2026, 10, 6, 4, 55) / 1000; // 23:55 Nov 5 in New York
+    github.set("me", { "2026-11-05": 10, "2026-11-06": 0 });
+    github.set("alice", { "2026-11-05": 5, "2026-11-06": 0 });
+    github.set("bob", { "2026-11-05": 1, "2026-11-06": 9 });
+    await registerNotifications();
+    await relay.runCycle();
+
+    // 00:05 Nov 6: alice already has 2 today, you have none.
+    github.set("alice", { "2026-11-05": 5, "2026-11-06": 2 });
+    clock.advance(10 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(0);
+
+    github.set("me", { "2026-11-05": 10, "2026-11-06": 3 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts.map((alert) => alert.payload.aps.alert.title)).toEqual(["🎉 You passed alice!"]);
+  });
+
+  it("keeps the last baseline while your own count can't be fetched", async () => {
+    await registerNotifications();
+    await relay.runCycle();
+    github.fail("me");
+    github.set("alice", { "2026-11-05": 4 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    // Stale beats missing: your last good 5 still counts, so this is a real pass.
+    github.set("alice", { "2026-11-05": 6 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts.map((alert) => alert.payload.login)).toEqual(["alice"]);
+  });
+
+  it("sends nothing without notification preferences, as for 1.0.x apps", async () => {
+    await register(ID);
+    await reportActivity(ID);
+    await relay.runCycle();
+    github.set("alice", { "2026-11-05": 7 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(0);
+    expect(apns.sent.length).toBeGreaterThan(0); // Live rank as before
+  });
+
+  it("sends nothing with passes off", async () => {
+    await registerNotifications({ notifications: { passes: "off" } });
+    await relay.runCycle();
+    github.set("alice", { "2026-11-05": 7 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(0);
+  });
+
+  // The iPhone's "any switch" gate: Passes off with another kind on sends `passes: "off"`, which
+  // skips passes only. The installation, its alert token and every other kind's state stay.
+  it("with passes off and another kind on, skips passes and keeps everything else", async () => {
+    await registerNotifications();
+    await relay.runCycle();
+    expect(JSON.parse(String((await storedRow())!.notification_state))).toHaveProperty("passes");
+    // Another kind's state, under a key no kind here owns (results and records write their own).
+    const theirs = { sent: "2026-11-04" };
+    const state = { ...JSON.parse(String((await storedRow())!.notification_state)), later: theirs };
+    await env.DB.prepare("UPDATE installations SET notification_state = ? WHERE id = ?")
+      .bind(JSON.stringify(state), ID).run();
+
+    await registerNotifications({ notifications: { window: "daily", passes: "off", results: true } });
+    github.set("alice", { "2026-11-05": 7 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+
+    expect(apns.alerts).toHaveLength(0);
+    const row = (await storedRow())!;
+    expect(row.alert_token).toBe(ALERT);
+    expect(JSON.parse(String(row.notifications_json))).toMatchObject({ passes: "off", results: true });
+    const kept = JSON.parse(String(row.notification_state)) as Record<string, unknown>;
+    expect(kept).not.toHaveProperty("passes");
+    expect(kept).toMatchObject({ later: theirs });
+  });
+
+  it("with passes back on, takes a fresh baseline instead of replaying what passed while off", async () => {
+    await registerNotifications();
+    await relay.runCycle();
+    await registerNotifications({ notifications: { window: "daily", passes: "off", results: true } });
+    github.set("alice", { "2026-11-05": 7 }); // passes you while Passes is off
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+
+    await registerNotifications();
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(0);
+
+    github.set("me", { "2026-11-05": 8 }); // a real pass after Passes is back on
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts.map((alert) => alert.payload.aps.alert.title)).toEqual(["🎉 You passed alice!"]);
+  });
+
+  it("never touches a Live Activity with Live rank off", async () => {
+    await registerNotifications();
+    // Even with tokens left behind in the row, nothing starts, updates or rotates.
+    await env.DB.prepare(
+      "UPDATE installations SET push_to_start_token = ?, activity_id = 'act-1', activity_push_token = ?, activity_started_at = ? WHERE id = ?",
+    ).bind(PTS, ACTIVITY, clock.seconds, ID).run();
+    for (let i = 0; i < 20; i++) {
+      github.set("me", { "2026-11-05": 5 + i });
+      clock.advance(30 * MINUTE);
+      await relay.runCycle();
+    }
+    expect(apns.sent).toHaveLength(0);
+    expect(apns.alerts.length).toBeGreaterThan(0); // bob was passed along the way
+  });
+
+  it("with Pinned rivals, sends only your pinned rivals' passes", async () => {
+    github.set("carol", { "2026-11-05": 1 });
+    await registerNotifications({
+      competitors: ["me", "alice", "bob", "carol"],
+      notifications: { passes: "rivals" },
+      rivals: ["alice"],
+    });
+    await relay.runCycle();
+    // You pass bob (not pinned) and carol passes you (not pinned): silent.
+    github.set("me", { "2026-11-05": 10 });
+    github.set("carol", { "2026-11-05": 11 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(0);
+
+    // alice, pinned, passes you.
+    github.set("alice", { "2026-11-05": 12 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts.map((alert) => alert.payload.login)).toEqual(["alice"]);
+  });
+
+  it("with Pinned rivals and nobody pinned, sends no passes", async () => {
+    await registerNotifications({ notifications: { passes: "rivals" }, rivals: [] });
+    await relay.runCycle();
+    github.set("alice", { "2026-11-05": 7 });
+    github.set("me", { "2026-11-05": 10 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(0);
+  });
+
+  it("a rival pinned mid-day fires on their next real crossing, not a stale one", async () => {
+    await registerNotifications({ notifications: { passes: "rivals" }, rivals: [] });
+    await relay.runCycle();
+    github.set("alice", { "2026-11-05": 7 }); // alice passes you while not pinned: silent
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+
+    await registerNotifications({ notifications: { passes: "rivals" }, rivals: ["alice"] });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(0); // the earlier pass isn't replayed
+
+    github.set("me", { "2026-11-05": 8 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts.map((alert) => alert.payload.aps.alert.title)).toEqual(["🎉 You passed alice!"]);
+  });
+
+  it("takes a silent baseline when the Window changes", async () => {
+    github.set("me", { "2026-11-04": 10, "2026-11-05": 5 });
+    github.set("alice", { "2026-11-04": 0, "2026-11-05": 8 });
+    await registerNotifications(); // Today: alice ahead 8–5
+    await relay.runCycle();
+
+    // Over 7 days you're ahead 15–8: switching isn't a pass.
+    await registerNotifications({ notifications: { window: "weekly" } });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(0);
+
+    github.set("alice", { "2026-11-04": 0, "2026-11-05": 16 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts.map((alert) => alert.payload.login)).toEqual(["alice"]);
+  });
+
+  describe("quiet hours", () => {
+    // New York is UTC−5 on Nov 5.
+    const at = (hour: number, minute = 0) => Date.UTC(2026, 10, 5, hour + 5, minute) / 1000;
+
+    async function passAt(seconds: number, notifications: unknown = NOTIFICATIONS) {
+      clock.seconds = seconds - 5 * MINUTE;
+      await registerNotifications({ notifications });
+      await relay.runCycle();
+      github.set("alice", { "2026-11-05": 7 });
+      clock.seconds = seconds;
+      await relay.runCycle();
+      expect(apns.alerts).toHaveLength(1);
+      return apns.alerts[0]!.payload.aps;
+    }
+
+    it("delivers a pass during quiet hours passively, with no sound", async () => {
+      const aps = await passAt(at(23, 30)); // default 22:00–08:00
+      expect(aps["interruption-level"]).toBe("passive");
+      expect(aps.sound).toBeUndefined();
+      expect(aps.alert.title).toBe("😤 alice passed you");
+    });
+
+    it("stays passive after local midnight, until quiet hours end", async () => {
+      // 03:00 on Nov 5 in New York is still inside 22:00–08:00.
+      const aps = await passAt(at(3, 0));
+      expect(aps["interruption-level"]).toBe("passive");
+      expect(aps.sound).toBeUndefined();
+    });
+
+    it("plays the sound outside quiet hours", async () => {
+      const aps = await passAt(at(21, 59));
+      expect(aps.sound).toBe("default");
+      expect(aps["interruption-level"]).toBeUndefined();
+    });
+
+    it("with quiet hours off, never goes passive", async () => {
+      const aps = await passAt(at(23, 30), { ...NOTIFICATIONS, quietHours: null });
+      expect(aps.sound).toBe("default");
+      expect(aps["interruption-level"]).toBeUndefined();
+    });
+
+    it("follows the chosen hours, inside a single day", async () => {
+      const aps = await passAt(at(13, 0), { ...NOTIFICATIONS, quietHours: { start: "12:30", end: "14:00" } });
+      expect(aps["interruption-level"]).toBe("passive");
+    });
+  });
+
+  it("clears a dead alert token and logs it", async () => {
+    const events: string[] = [];
+    relay = createRelay({
+      db: env.DB, apns, github: github.fetch, githubName: github.name, now: clock.now, bundleId: BUNDLE,
+      log: (event, fields) => events.push(`${event}:${fields?.token ?? ""}`),
+    });
+    await registerNotifications();
+    await relay.runCycle();
+    apns.respond(ALERT, { status: 410, reason: "Unregistered" });
+    github.set("alice", { "2026-11-05": 7 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect((await storedRow())!.alert_token).toBeNull();
+    expect(events).toContain("token_cleared:alert");
+
+    github.set("bob", { "2026-11-05": 3 });
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.alerts).toHaveLength(1); // the failed one only
   });
 });

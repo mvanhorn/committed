@@ -1,9 +1,10 @@
 import type { LiveRankState } from "./liveRank";
 
 /**
- * APNs for Live Activities: token-based auth (ES256 JWT from a `.p8` key, signed with
- * WebCrypto) and the three ActivityKit events the relay sends: `update`, `end`, `start`
- * (push-to-start). See relay/README.md for the HTTP/2 spike and runtime choice.
+ * APNs: token-based auth (ES256 JWT from a `.p8` key, signed with WebCrypto). Two kinds of push:
+ * Live Activities (the three ActivityKit events the relay sends: `update`, `end`, `start`
+ * (push-to-start)) and ordinary alert notifications (relay notifications, spec #124). See
+ * relay/README.md for the HTTP/2 spike and runtime choice.
  */
 
 export type ApnsEnvironment = "sandbox" | "production";
@@ -21,12 +22,45 @@ export interface ApnsPayload {
   };
 }
 
-export interface ApnsRequest {
+/** An alert notification's `aps`, plus Committed's own keys beside it. */
+export interface AlertPayload {
+  aps: {
+    alert: { title: string; body: string };
+    sound?: "default";
+    /** `PASS` for passes: the iPhone registers its actions (Share your race, Open Board). */
+    category?: string;
+    /** One per kind, so iOS groups them. */
+    "thread-id": string;
+    /** "passive" delivers without sound or lighting the screen (quiet hours). */
+    "interruption-level"?: "passive" | "active";
+  };
+  /** Which kind of relay notification: "pass", "closeCall", "record", … */
+  kind: string;
+  /** The rival it's about (a pass's or close call's), which the app opens on tap. */
+  login?: string;
+}
+
+interface Delivery {
   token: string;
   environment: ApnsEnvironment;
   priority: 5 | 10;
+}
+
+/** A Live Activity push (the default, so Live rank's call sites name nothing). */
+export interface LiveActivityRequest extends Delivery {
+  pushType?: "liveactivity";
   payload: ApnsPayload;
 }
+
+/** An alert notification to the iPhone's ordinary device token. */
+export interface AlertRequest extends Delivery {
+  pushType: "alert";
+  payload: AlertPayload;
+  /** A newer push with the same id replaces an undelivered or unread one. */
+  collapseId?: string;
+}
+
+export type ApnsRequest = LiveActivityRequest | AlertRequest;
 
 export interface ApnsResult {
   status: number;
@@ -148,15 +182,22 @@ export function createHttpApnsSender(config: HttpApnsConfig): ApnsSender {
   return {
     async send(request) {
       const host = config.origin ? config.origin.replace(/\/+$/, "") : HOSTS[request.environment];
+      const headers: Record<string, string> = {
+        authorization: `bearer ${await provider.get()}`,
+        "apns-priority": String(request.priority),
+        "content-type": "application/json",
+      };
+      if (request.pushType === "alert") {
+        headers["apns-push-type"] = "alert";
+        headers["apns-topic"] = config.bundleId;
+        if (request.collapseId) headers["apns-collapse-id"] = request.collapseId;
+      } else {
+        headers["apns-push-type"] = "liveactivity";
+        headers["apns-topic"] = `${config.bundleId}.push-type.liveactivity`;
+      }
       const response = await doFetch(`${host}/3/device/${request.token}`, {
         method: "POST",
-        headers: {
-          authorization: `bearer ${await provider.get()}`,
-          "apns-push-type": "liveactivity",
-          "apns-topic": `${config.bundleId}.push-type.liveactivity`,
-          "apns-priority": String(request.priority),
-          "content-type": "application/json",
-        },
+        headers,
         body: JSON.stringify(request.payload),
       });
       if (response.status === 200) return { status: 200 };

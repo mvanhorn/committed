@@ -42,6 +42,9 @@ enum SampleServices {
         /// Every person's counts multiplied by this, for the widest numbers a real board shows
         /// (screenshot fixture only). Streaks stay as they are.
         var countScale = 1
+        /// Your count today instead of the usual, so a big one sets a record for the record card
+        /// and Your records (screenshot fixture only).
+        var recordDay: Int?
     }
 
     static func make(_ options: Options = Options(), now: @escaping @Sendable () -> Date = { Date() })
@@ -55,7 +58,8 @@ enum SampleServices {
         return CommittedServices(
             store: StandingsStore(persistence: InMemoryCompetitorPersistence()),
             credentials: InMemoryGitHubCredentialStore(token: "sample"),
-            contributions: SampleContributions(trollPerson: options.trollPerson, countScale: options.countScale),
+            contributions: SampleContributions(trollPerson: options.trollPerson, countScale: options.countScale,
+                                               recordDay: options.recordDay),
             // Even a stray Connect GitHub on this graph stays on the phone.
             gitHubAuth: GitHubAuth(clientID: "sample", session: session),
             accountFactory: { GitHubAccountClient(token: $0, session: session) },
@@ -79,10 +83,12 @@ enum SampleServices {
         private var rounds: [String: Int] = [:]
         private let trollPerson: String?
         private let countScale: Int
+        private let recordDay: Int?
 
-        init(trollPerson: String? = nil, countScale: Int = 1) {
+        init(trollPerson: String? = nil, countScale: Int = 1, recordDay: Int? = nil) {
             self.trollPerson = trollPerson
             self.countScale = countScale
+            self.recordDay = recordDay
         }
 
         func standingCounts(for username: String, window: ContributionWindow, asOf reference: Date)
@@ -111,6 +117,9 @@ enum SampleServices {
                 history = person.history(asOf: reference, timeZone: timeZone)
             } else {
                 return .failure(.network("offline"))
+            }
+            if username == SampleServices.owner, let recordDay {
+                history.days[ContributionHistory.key(for: reference, in: history.calendar)] = recordDay
             }
             if username == trollPerson {
                 // 784 more today, far above their usual: the real trolling rule marks the row.

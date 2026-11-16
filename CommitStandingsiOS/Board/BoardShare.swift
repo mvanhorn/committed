@@ -247,7 +247,7 @@ extension WidgetSnapshot {
 }
 
 /// Committed and how many people are on the board, then where to get it.
-private struct BoardShareFooter: View {
+struct BoardShareFooter: View {
     let peopleCount: Int
 
     var body: some View {
@@ -266,8 +266,9 @@ private struct BoardShareFooter: View {
 }
 
 /// The contribution graph's squares behind everything, as on the site: mostly empty, some green,
-/// the odd lime one. The same pattern every time, brightest at the edges.
-private struct BoardShareSquareField: View {
+/// the odd lime one. The same pattern every time, brightest at the edges. Challenge's story image
+/// draws it too.
+struct BoardShareSquareField: View {
     let brightness: Double
 
     var body: some View {
@@ -316,24 +317,16 @@ private struct BoardShareSquareField: View {
 enum BoardShareRenderer {
     /// The image at `format.pixelSize`.
     static func image(_ snapshot: WidgetSnapshot, style: BoardShareStyle, format: BoardShareFormat) -> UIImage? {
-        let renderer = ImageRenderer(content: BoardShareCard(snapshot: snapshot, style: style, format: format))
-        renderer.scale = BoardShareFormat.renderScale
-        renderer.isOpaque = true
-        return renderer.uiImage
+        ShareImageRenderer.image(BoardShareCard(snapshot: snapshot, style: style, format: format))
     }
 
     /// The image as a PNG in a temporary folder, named for what it shows, for the share sheet. Each
     /// render replaces the last one of the same style and format.
     static func file(_ snapshot: WidgetSnapshot, style: BoardShareStyle, format: BoardShareFormat) throws -> URL {
-        guard let data = image(snapshot, style: style, format: format)?.pngData() else {
-            throw CocoaError(.fileWriteUnknown)
-        }
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("board-share", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let window = (snapshot.state.contributionWindow ?? .daily).shortTitle.replacingOccurrences(of: " ", with: "-")
-        let url = directory.appendingPathComponent("Committed-\(window)-\(style.rawValue)-\(format.rawValue).png")
-        try data.write(to: url, options: .atomic)
-        return url
+        return try ShareImageRenderer.file(BoardShareCard(snapshot: snapshot, style: style, format: format),
+                                           folder: "board-share",
+                                           name: "Committed-\(window)-\(style.rawValue)-\(format.rawValue).png")
     }
 }
 
@@ -405,22 +398,11 @@ struct BoardShareSheet: View {
         }
         // The image alone: no title or caption rides along into the post or message.
         .sheet(item: $sharing) { file in
-            BoardShareActivity(url: file.url)
+            ShareActivity(items: [file.url])
                 .presentationDetents([.medium, .large])
                 .ignoresSafeArea()
         }
     }
-}
-
-/// The system share sheet with only the PNG.
-private struct BoardShareActivity: UIViewControllerRepresentable {
-    let url: URL
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: [url], applicationActivities: nil)
-    }
-
-    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
 /// One page of the carousel: the card itself, scaled to fit the page.

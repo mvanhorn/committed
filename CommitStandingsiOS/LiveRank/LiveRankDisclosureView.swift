@@ -1,7 +1,9 @@
 import SwiftUI
 
 /// Shown once before Live rank first turns on with the Committed relay: what the relay receives
-/// (public usernames) and what it never receives (the GitHub token). "Not Now" leaves Live rank off.
+/// (public usernames) and what it never receives (the GitHub token), and that it also sends relay
+/// notifications, with what it receives for them: notification choices, pinned rivals and the
+/// notification token (`RelayConsent.currentVersion`). "Not Now" leaves Live rank off.
 struct LiveRankDisclosureView: View {
     @Environment(AppModel.self) private var model
     @State private var isWorking = false
@@ -28,16 +30,20 @@ struct LiveRankDisclosureView: View {
                         Divider().overlay(Color.hairline)
                         point("It also gets your Live rank Window, time zone, and the tokens that update Live rank on this iPhone.",
                               systemImage: "clock")
+                        Divider().overlay(Color.hairline)
+                        point(Text("**Notifications:** the relay checks the same public counts and sends the notifications you turn on, even with Committed closed. For them it also gets your notification choices, the rivals you pinned, and the token Apple uses to deliver notifications to this iPhone."),
+                              systemImage: "bell")
                     }
                     .padding(.horizontal, 16)
                     .tileCard()
-                    Text("Turning Live rank off or disconnecting GitHub deletes this iPhone's registration from the relay.")
+                    Text("Turning off Live rank and every notification, or disconnecting GitHub, deletes this iPhone's registration from the relay.")
                         .font(.footnote)
                         .foregroundStyle(Color.muted)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)
             }
+            .defaultScrollAnchor(relaySheetScrollAnchor)
             .background {
                 ZStack(alignment: .top) {
                     Color.ink
@@ -84,16 +90,11 @@ struct LiveRankDisclosureView: View {
     }
 
     private func point(_ text: String, systemImage: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Image(systemName: systemImage)
-                .foregroundStyle(Color.lime)
-                .frame(width: iconWidth)
-                .accessibilityHidden(true)
-            Text(text)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.vertical, 14)
-        .accessibilityElement(children: .combine)
+        point(Text(text), systemImage: systemImage)
+    }
+
+    private func point(_ text: Text, systemImage: String) -> some View {
+        RelayPoint(text: text, systemImage: systemImage, iconWidth: iconWidth)
     }
 
     private func choose(_ action: @escaping @MainActor () async -> Void) {
@@ -103,4 +104,33 @@ struct LiveRankDisclosureView: View {
             isWorking = false
         }
     }
+}
+
+/// One line of what the Committed relay receives or does, with its lime icon.
+struct RelayPoint: View {
+    let text: Text
+    let systemImage: String
+    let iconWidth: CGFloat
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Image(systemName: systemImage)
+                .foregroundStyle(Color.lime)
+                .frame(width: iconWidth)
+                .accessibilityHidden(true)
+            text
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 14)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Where the relay sheets open: the top, or the end for fixture captures (`-ScreenshotSheetEnd`).
+@MainActor
+var relaySheetScrollAnchor: UnitPoint {
+    #if DEBUG
+    if ScreenshotFixture.sheetScrolledToEnd { return .bottom }
+    #endif
+    return .top
 }

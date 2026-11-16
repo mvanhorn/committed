@@ -51,7 +51,8 @@ struct LiveRankRelayLifecycleTests {
         )
     }
 
-    private var registered: [LiveRankConfiguration] { relay.configurations.compactMap { $0 } }
+    /// Boards sent with Live rank on (with it off, the board goes only for relay notifications).
+    private var registered: [LiveRankConfiguration] { relay.configurations.compactMap { $0 }.filter(\.liveRank) }
 
     // MARK: Disclosure
 
@@ -77,7 +78,10 @@ struct LiveRankRelayLifecycleTests {
         #expect(model.liveRank.isEnabled)
         #expect(activities.startedPushUpdates == [.token])
         #expect(registered == [LiveRankConfiguration(selfLogin: "me", competitors: ["me", "ada", "bo"], window: .daily)])
-        #expect(preferences.load() == LiveRankPreferences(isEnabled: true, window: .daily, relayDisclosureAccepted: true))
+        #expect(preferences.load() == LiveRankPreferences(
+            isEnabled: true, window: .daily, relayDisclosureAccepted: true,
+            relayDisclosureVersion: RelayConsent.currentVersion, relayNotifications: true
+        ))
     }
 
     @Test func theDisclosureAppearsOnlyOnce() async {

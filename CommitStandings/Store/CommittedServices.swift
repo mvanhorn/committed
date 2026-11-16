@@ -100,7 +100,8 @@ final class CommittedServices {
             store: StandingsStore(
                 snapshotPersistence: UserDefaultsStandingsSnapshotPersistence(),
                 hiddenPeoplePersistence: UserDefaultsHiddenPeoplePersistence(),
-                historyPersistence: FileContributionHistoryPersistence.live() ?? InMemoryContributionHistoryPersistence()
+                historyPersistence: FileContributionHistoryPersistence.live() ?? InMemoryContributionHistoryPersistence(),
+                pinnedRivalsPersistence: UserDefaultsPinnedRivalsPersistence()
             ),
             credentials: KeychainGitHubCredentialStore(),
             rosterPersistence: UserDefaultsGitHubRosterPersistence(),

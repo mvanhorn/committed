@@ -120,6 +120,9 @@ function compile(gl: WebGL2RenderingContext, type: number, source: string) {
   return shader;
 }
 
+// What the glow sits on: the hero's Mac desktop, or a page's own element marked `data-field-desk`.
+const DESK = ".desk-frame, [data-field-desk]";
+
 // The canvas reaches from above the headline to below the desk.
 const BELOW = "clamp(120px,16vw,280px)";
 const HEAD_PAD = 180;
@@ -168,7 +171,7 @@ function Field({ around }: { around: RefObject<HTMLDivElement | null> }) {
 
     const measure = () => {
       const wrap = around.current;
-      const desk = wrap?.querySelector(".desk-frame");
+      const desk = wrap?.querySelector(DESK);
       // Offsets ignore transforms, so the headline's rise animation doesn't skew the measurement.
       const head = document.querySelector<HTMLElement>("main h1");
       if (!wrap || !desk || !head) return;
@@ -227,7 +230,7 @@ function Field({ around }: { around: RefObject<HTMLDivElement | null> }) {
       draw();
     });
     ro.observe(canvas);
-    const desk = around.current?.querySelector(".desk-frame");
+    const desk = around.current?.querySelector(DESK);
     if (desk) ro.observe(desk);
     const io = new IntersectionObserver(([entry]) => {
       onScreen = entry.isIntersecting;
@@ -259,7 +262,7 @@ function Field({ around }: { around: RefObject<HTMLDivElement | null> }) {
   );
 }
 
-/** Wraps the hero desktop with the square field behind it. */
+/** Wraps the hero desktop (or another `data-field-desk` element) with the square field behind it. */
 export function SquareField({ children }: { children: ReactNode }) {
   const around = useRef<HTMLDivElement>(null);
   return (

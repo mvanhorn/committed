@@ -1,0 +1,354 @@
+import Foundation
+import Testing
+import UserNotifications
+@testable import CommitStandingsiOS
+
+/// Settings ▸ Notifications (#130): what the screen offers in each kind of build, choices saved per
+/// account that reach the relay right away, pinned rivals sent as `rivals`, and the permission state.
+@MainActor
+struct NotificationsScreenTests {
+    let clock = TestClock()
+    let activities = FakeLiveRankActivities()
+    let relay = FakeLiveRankRelay()
+    let preferences = InMemoryLiveRankPreferences()
+    let choices = InMemoryNotificationPreferences()
+    let defaults = UserDefaults(suiteName: "NotificationsScreenTests.\(UUID().uuidString)")!
+
+    init() {
+        relay.pushUpdates = .token
+    }
+
+    private func makeModel(
+        signedIn: Bool = true,
+        notificationsOn: Bool = true,
+        authorization: UNAuthorizationStatus = .authorized
+    ) -> AppModel {
+        defaults.set(notificationsOn, forKey: NotificationService.enabledDefaultsKey)
+        let session: URLSession = {
+            let config = URLSessionConfiguration.ephemeral
+            config.protocolClasses = [ApprovingGitHubProtocol.self]
+            return URLSession(configuration: config)
+        }()
+        let clock = clock
+        let services = CommittedServices(
+            store: StandingsStore(persistence: InMemoryCompetitorPersistence()),
+            credentials: InMemoryGitHubCredentialStore(token: signedIn ? "gho_test" : nil),
+            contributions: FakeContributions(["me": 3, "ada": 5, "bo": 1]),
+            notifications: NotificationService(defaults: defaults, authorize: { true }, sink: { _ in }),
+            gitHubAuth: GitHubAuth(clientID: "test", session: session, sleep: { _ in }, now: { clock.now }),
+            accountFactory: { GitHubAccountClient(token: $0, session: session) },
+            fetchRoster: { _ in
+                GitHubRosterSnapshot(owner: "me", sources: [
+                    GitHubRosterSource(id: "following", title: "Following", members: ["ada", "bo"]),
+                ], updatedAt: clock.now)
+            },
+            refreshInterval: 9_999,
+            now: { clock.now }
+        )
+        return AppModel(
+            services: services,
+            sampleServices: { [clock] in SampleServices.make(now: { clock.now }) },
+            backgroundTime: FakeBackgroundTime(),
+            liveRankActivities: activities, liveRankPreferences: preferences, liveRankRelay: relay,
+            notificationPreferences: choices,
+            notificationAuthorization: { authorization },
+            now: { clock.now }
+        )
+    }
+
+    /// Relay notifications agreed to, Live rank off.
+    private func agreedToRelayNotifications() {
+        preferences.save(LiveRankPreferences(isEnabled: false, relayDisclosureAccepted: true, relayNotifications: true))
+    }
+
+    private var lastNotifications: RelayNotificationsConfiguration? {
+        relay.notifications.last ?? nil
+    }
+
+    // MARK: What the screen shows
+
+    @Test func aRelayBuildShowsEveryChoice() async {
+        agreedToRelayNotifications()
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+        #expect(model.showsRelayNotificationChoices)
+    }
+
+    @Test func aBuildWithoutTheRelayShowsOnlyPasses() async {
+        relay.pushUpdates = .none
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+        #expect(!model.showsRelayNotificationChoices)
+    }
+
+    @Test func theSampleBoardShowsOnlyPasses() async {
+        agreedToRelayNotifications()
+        let model = makeModel(signedIn: false)
+        await model.startSampleBoard()
+        #expect(model.mode == .sampleBoard)
+        #expect(!model.showsRelayNotificationChoices)
+    }
+
+    @Test func notNowShowsOnlyPassesWithTheInAppBehavior() async {
+        preferences.save(LiveRankPreferences(isEnabled: false, relayDisclosureAccepted: true, relayNotifications: false))
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+        #expect(!model.showsRelayNotificationChoices)
+    }
+
+    // MARK: Saving
+
+    @Test func aChoiceIsSavedForThisAccountAndReachesTheRelayRightAway() async {
+        agreedToRelayNotifications()
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+
+        await model.updateNotificationChoices { $0.passes = .rivals }
+        await model.updateNotificationChoices { $0.window = .monthly }
+        await model.updateNotificationChoices { $0.quietHours = .init(start: "23:30", end: "07:00") }
+
+        var expected = NotificationPreferences()
+        expected.passes = .rivals
+        expected.window = .monthly
+        expected.quietHours = .init(start: "23:30", end: "07:00")
+        #expect(model.notificationChoices == expected)
+        #expect(choices.load(account: "me") == expected)
+        #expect(choices.load(account: "someone-else") == NotificationPreferences())
+        #expect(lastNotifications?.preferences == expected)
+    }
+
+    /// Results (#131): Daily and weekly results, on by default, saved and sent as `results`.
+    @Test func resultsAreOnByDefaultAndTurningThemOffReachesTheRelay() async {
+        agreedToRelayNotifications()
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+        #expect(model.notificationChoices.results)
+
+        await model.updateNotificationChoices { $0.results = false }
+
+        #expect(!model.notificationChoices.results)
+        #expect(choices.load(account: "me").results == false)
+        #expect(lastNotifications?.preferences.results == false)
+
+        await model.updateNotificationChoices { $0.results = true }
+        #expect(lastNotifications?.preferences.results == true)
+    }
+
+    /// About you ▸ Records (#134): on by default, saved for this account and sent as `records`.
+    @Test func theRecordsSwitchIsOnByDefaultSavedAndSent() async throws {
+        agreedToRelayNotifications()
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+        #expect(model.notificationChoices.records)
+        #expect(lastNotifications?.preferences.records == true)
+
+        model.notificationChoice(\.records).wrappedValue = false
+        // The binding saves and re-registers in a task of its own: wait (up to 5 s) for it.
+        for _ in 0..<500 where lastNotifications?.preferences.records != false {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(model.notificationChoices.records == false)
+        #expect(choices.load(account: "me").records == false)
+        #expect(lastNotifications?.preferences.records == false)
+    }
+
+    @Test func quietHoursOffReachTheRelayAsNull() async {
+        agreedToRelayNotifications()
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+
+        await model.setQuietHoursOn(false)
+        #expect(lastNotifications?.preferences.quietHours == nil)
+
+        await model.setQuietHoursOn(true)
+        #expect(lastNotifications?.preferences.quietHours == .init(start: "22:00", end: "08:00"))
+    }
+
+    @Test func closeCallsStartOffAndTurningThemOnIsSavedAndReachesTheRelay() async {
+        agreedToRelayNotifications()
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+        #expect(model.notificationChoices.closeCalls == false)
+
+        await model.updateNotificationChoices { $0.closeCalls = true }
+
+        #expect(model.notificationChoices.closeCalls)
+        #expect(choices.load(account: "me").closeCalls)
+        #expect(lastNotifications?.preferences.closeCalls == true)
+    }
+
+    /// Before any switch is turned on (no permission asked yet), a choice such as the Window is
+    /// saved, but it turns nothing on: the relay hears notifications off.
+    @Test func aChoiceBeforeAnySwitchIsOnTurnsNothingOn() async {
+        agreedToRelayNotifications()
+        let model = makeModel(notificationsOn: false)
+        await model.sceneDidBecomeActive()
+
+        await model.updateNotificationChoices { $0.window = .weekly }
+
+        #expect(model.notificationChoices.window == .weekly)
+        #expect(relay.notifications.last == .some(nil))
+    }
+
+    /// About you's Streak reminder switch (#133): off by default; turning it on through the
+    /// screen's binding saves it for this account and tells the relay.
+    @Test func theStreakReminderSwitchIsSavedAndReachesTheRelay() async {
+        agreedToRelayNotifications()
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+        let streakReminder = model.notificationChoice(\.streakReminder)
+        #expect(!streakReminder.wrappedValue)
+        #expect(lastNotifications?.preferences.streakReminder == false)
+
+        streakReminder.wrappedValue = true
+        for _ in 0..<200 where lastNotifications?.preferences.streakReminder != true { await Task.yield() }
+
+        #expect(streakReminder.wrappedValue)
+        #expect(choices.load(account: "me").streakReminder)
+        #expect(choices.load(account: "someone-else").streakReminder == false)
+        #expect(lastNotifications?.preferences.streakReminder == true)
+    }
+
+    /// Delivery (#135): **Passes now, the rest at 9 PM** by default; **Right away** through the
+    /// screen's binding is saved for this account and sent as `delivery`.
+    @Test func theDeliveryChoiceIsSavedAndReachesTheRelay() async {
+        agreedToRelayNotifications()
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+        let delivery = model.notificationChoice(\.delivery)
+        #expect(delivery.wrappedValue == .summary)
+        #expect(lastNotifications?.preferences.delivery == .summary)
+
+        delivery.wrappedValue = .immediate
+        for _ in 0..<200 where lastNotifications?.preferences.delivery != .immediate { await Task.yield() }
+
+        #expect(delivery.wrappedValue == .immediate)
+        #expect(choices.load(account: "me").delivery == .immediate)
+        #expect(choices.load(account: "someone-else").delivery == .summary)
+        #expect(lastNotifications?.preferences.delivery == .immediate)
+        // Choosing how notifications arrive turns no kind on or off.
+        #expect(model.relayNotificationsOn)
+        #expect(model.notificationChoices.results)
+    }
+
+    @Test func theSampleBoardSavesNoChoices() async {
+        agreedToRelayNotifications()
+        let model = makeModel(signedIn: false)
+        await model.startSampleBoard()
+
+        await model.updateNotificationChoices { $0.passes = .rivals }
+
+        #expect(model.notificationChoices == NotificationPreferences())
+        #expect(relay.notifications.compactMap { $0 }.isEmpty)
+    }
+
+    // MARK: Pinned rivals
+
+    @Test func pinningAndUnpinningReRegistersTheRivals() async {
+        agreedToRelayNotifications()
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+        #expect(lastNotifications?.rivals == [])
+
+        #expect(await model.setRivalPinned(true, username: "ada"))
+        #expect(lastNotifications?.rivals == ["ada"])
+        #expect(await model.setRivalPinned(true, username: "bo"))
+        #expect(lastNotifications?.rivals == ["ada", "bo"])
+
+        #expect(await model.setRivalPinned(false, username: "ada"))
+        #expect(lastNotifications?.rivals == ["bo"])
+    }
+
+    @Test func hidingAPinnedRivalReRegistersWithoutThem() async {
+        agreedToRelayNotifications()
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+        await model.setRivalPinned(true, username: "ada")
+
+        model.store.setHidden(true, username: "ada")
+        await model.visibilityDidChange()
+
+        #expect(lastNotifications?.rivals == [])
+    }
+
+    @Test func pinningWithRelayNotificationsOffTellsTheRelayNothing() async {
+        relay.pushUpdates = .none
+        let model = makeModel()
+        await model.sceneDidBecomeActive()
+
+        #expect(await model.setRivalPinned(true, username: "ada"))
+
+        #expect(model.store.isPinned("ada"))
+        #expect(relay.notifications.compactMap { $0 }.isEmpty)
+    }
+
+    // MARK: Permission
+
+    @Test func permissionDeniedInIOSSettingsIsShown() async {
+        let model = makeModel(authorization: .denied)
+        await model.checkNotificationPermission()
+        #expect(model.notificationsDeniedInSettings)
+    }
+
+    @Test func permissionGrantedIsNotDenied() async {
+        let model = makeModel(authorization: .authorized)
+        await model.checkNotificationPermission()
+        #expect(!model.notificationsDeniedInSettings)
+    }
+}
+
+/// Quiet hours' "HH:MM" times, as the relay reads them, from any clock the iPhone shows.
+struct QuietHoursTimeTests {
+    @Test func formatsTwentyFourHourTimesWithLeadingZeros() {
+        #expect(NotificationPreferences.QuietHours.time(hour: 22, minute: 0) == "22:00")
+        #expect(NotificationPreferences.QuietHours.time(hour: 8, minute: 5) == "08:05")
+        #expect(NotificationPreferences.QuietHours.time(hour: 0, minute: 0) == "00:00")
+        #expect(NotificationPreferences.QuietHours.time(hour: 23, minute: 59) == "23:59")
+    }
+
+    @Test func readsTimesBack() {
+        #expect(NotificationPreferences.QuietHours.hourAndMinute("22:00") == .init(hour: 22, minute: 0))
+        #expect(NotificationPreferences.QuietHours.hourAndMinute("07:30") == .init(hour: 7, minute: 30))
+        #expect(NotificationPreferences.QuietHours.hourAndMinute("nonsense") == nil)
+    }
+
+    @Test func aDatePickersDateBecomesItsLocalTime() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "Asia/Tokyo"))
+        // 2026-11-05T14:30:00Z is 23:30 in Tokyo, whatever the device's 12- or 24-hour setting.
+        let date = Date(timeIntervalSince1970: 1_793_889_000)
+        #expect(NotificationPreferences.QuietHours.time(from: date, calendar: calendar) == "23:30")
+        let back = try #require(NotificationPreferences.QuietHours.date(for: "23:30", calendar: calendar))
+        #expect(calendar.dateComponents([.hour, .minute], from: back) == DateComponents(hour: 23, minute: 30))
+    }
+}
+
+/// When the evening summary (#135) goes out, as relay/src/notifications/summary.ts decides it:
+/// 9 PM, or when quiet hours start if that's earlier in the afternoon or evening.
+struct EveningSummaryTimeTests {
+    private func summaryTime(quietHours: NotificationPreferences.QuietHours?) -> String {
+        var choices = NotificationPreferences()
+        choices.quietHours = quietHours
+        return choices.summaryTime
+    }
+
+    @Test func isNinePMByDefault() {
+        #expect(NotificationPreferences().summaryTime == "21:00")
+        #expect(summaryTime(quietHours: nil) == "21:00")
+    }
+
+    @Test func movesUpToQuietHoursStartingEarlierInTheEvening() {
+        #expect(summaryTime(quietHours: .init(start: "20:30", end: "07:00")) == "20:30")
+        #expect(summaryTime(quietHours: .init(start: "12:00", end: "13:00")) == "12:00")
+    }
+
+    @Test func staysAtNinePMOtherwise() {
+        #expect(summaryTime(quietHours: .init(start: "23:00", end: "07:00")) == "21:00")
+        #expect(summaryTime(quietHours: .init(start: "21:00", end: "07:00")) == "21:00")
+        #expect(summaryTime(quietHours: .init(start: "06:00", end: "11:00")) == "21:00")
+        #expect(summaryTime(quietHours: .init(start: "00:30", end: "07:00")) == "21:00")
+        // The same start and end is never quiet.
+        #expect(summaryTime(quietHours: .init(start: "20:00", end: "20:00")) == "21:00")
+    }
+}
