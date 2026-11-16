@@ -55,7 +55,7 @@ async function registerAt(seconds: number, notifications: Record<string, unknown
         apnsEnvironment: "production",
         liveRank: false,
         alertToken: ALERT,
-        notifications: { streakReminder: true, ...notifications },
+        notifications: { streakReminder: true, delivery: "immediate", ...notifications },
       }),
     }),
   );

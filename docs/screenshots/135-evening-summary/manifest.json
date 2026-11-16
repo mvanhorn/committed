@@ -1,0 +1,52 @@
+{
+  "device": "iPhone Duo Simulator (shared persistent Duo 94D56458-B90B-484A-BA5E-16748D2CBEE5), closed, portrait",
+  "os": "iOS 27.1",
+  "notes": "Runtime captures, not renders, on ticket/135-evening-summary based on spec/124-habit-loop with #131 merged. Choices are set through the fixture (no tap access from the agent); the Delivery binding is covered by NotificationsScreenTests.theDeliveryChoiceIsSavedAndReachesTheRelay. No before capture at this scroll position: before this branch nothing could scroll the screen to its end, and Delivery is new (the section sat between About you and Quiet hours as a comment). The app has one (dark) appearance, so light/dark isn't separate. The summary tap feeds a summary response through the notification delegate's own route (-ScreenshotNotificationResponse with -ScreenshotNotificationKind summary); no notification was shown, since relay alert pushes can't reach the Simulator without a real APNs token. The summary's copy and timing are pinned by relay/test/eveningSummary.test.ts. The open iPhone Duo and accessibility text sizes were not captured.",
+  "screenshots": [
+    {
+      "file": "notifications-delivery-summary.png",
+      "caption": "After: Delivery between About you and Quiet hours, Passes now, the rest at 9 PM chosen by default; footer \"Passes and results arrive as they happen. Close calls, records and the streak reminder come together in one summary at 9 PM.\"",
+      "capture": {
+        "sourceCommit": "565774d745c3416092a004a6adb5a58fd21a7a81",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotTab settings -ScreenshotNotifications -ScreenshotNotificationsEnd (scrolls the screen to Delivery once it loads)."
+    },
+    {
+      "file": "notifications-delivery-right-away.png",
+      "caption": "Right away chosen; footer \"Each notification arrives as it happens.\"",
+      "capture": {
+        "sourceCommit": "565774d745c3416092a004a6adb5a58fd21a7a81",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotTab settings -ScreenshotNotifications -ScreenshotNotificationsEnd (scrolls the screen to Delivery once it loads) -ScreenshotDelivery immediate."
+    },
+    {
+      "file": "notifications-delivery-quiet-hours.png",
+      "caption": "Quiet hours 8:30 PM to 7:00 AM: the footer moves the summary to 8:30 PM, when quiet hours start (the label keeps the spec's \"9 PM\")",
+      "capture": {
+        "sourceCommit": "565774d745c3416092a004a6adb5a58fd21a7a81",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -RelayDisclosureAccepted -RelayNotificationsAccepted -notifyOnPositionChange YES -ScreenshotTab settings -ScreenshotNotifications -ScreenshotNotificationsEnd (scrolls the screen to Delivery once it loads) -ScreenshotQuietHours 20:30-07:00."
+    },
+    {
+      "file": "notifications-delivery-before-opt-in.png",
+      "caption": "Before any switch is on (every kind reads off): Delivery is disabled, footer \"Turn on a notification to choose how they arrive.\" The first switch on brings the defaults, this choice included",
+      "capture": {
+        "sourceCommit": "565774d745c3416092a004a6adb5a58fd21a7a81",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -RelayDisclosureAccepted -RelayNotificationsAccepted -ScreenshotTab settings -ScreenshotNotifications -ScreenshotNotificationsEnd (scrolls the screen to Delivery once it loads) -notifyOnPositionChange NO."
+    },
+    {
+      "file": "summary-tap-board.png",
+      "caption": "A tapped evening summary (Committed closed) opens the Board on the Board tab",
+      "capture": {
+        "sourceCommit": "565774d745c3416092a004a6adb5a58fd21a7a81",
+        "fixture": true
+      },
+      "notes": "Screenshot fixture (-ScreenshotFixture, Sample board data, -ScreenshotDate 2026-11-12T19:00:00Z), Debug build with COMMITTED_RELAY_URL=http://localhost:8787 (no relay running; never the production relay), shared iPhone Duo closed, portrait, captured with xcrun simctl io --display=1 inside the apple-session lease. Every capture: -RelayDisclosureAccepted -RelayNotificationsAccepted, launched with -notifyOnPositionChange YES -ScreenshotTab settings -ScreenshotNotificationResponse com.apple.UNNotificationDefaultActionIdentifier:none -ScreenshotNotificationKind summary."
+    }
+  ]
+}

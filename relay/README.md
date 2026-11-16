@@ -118,8 +118,9 @@ Registers or updates. `{id}` is 8 to 64 characters of `[A-Za-z0-9-]`; a UUID wor
   keeps the alert token only while `notifications` is set.
 - Passes act on `window`, `passes` (`"rivals"` sends only pinned rivals' passes) and quiet hours
   (#130); close calls on `closeCalls`, `window`, `rivals` and quiet hours (#132); results on
-  `results` and quiet hours (#131). `delivery` and the other kinds are stored now and take effect
-  in later tickets (#133–#135).
+  `results` and quiet hours (#131); records on `records` (#134); the streak reminder on
+  `streakReminder` (#133); `delivery` decides whether close calls, records and the streak
+  reminder go out right away or in the evening summary (#135).
 - At most 1,000 competitors, self included.
 - Returns `201` on creation, `200` on update.
 - A changed competitor list resets today's movement baseline, as a visibility change does in
@@ -504,8 +505,8 @@ WIDGET_SCREENS=/some/dir npm run test:browser   # also save a screenshot of each
      between); with nobody pinned, only the person directly above you (`order`, you first among
      ties). At most one per person per local day (`{"closeCalls": {"date", "sent": [logins]}}`),
      and none during quiet hours: one still close when they end goes out then. They run with
-     `passes: "off"` too. `sendCloseCallsNow` is the immediate-delivery step; summary delivery
-     (#135) holds them for the evening summary instead. Each is one alert push,
+     `passes: "off"` too. `sendCloseCallsNow` is the immediate-delivery step; in summary delivery
+     they're held for the evening summary instead. Each is one alert push,
      `apns-collapse-id: closeCall.<login>`; a tap opens that person's view:
 
      ```json
@@ -554,7 +555,7 @@ WIDGET_SCREENS=/some/dir npm run test:browser   # also save a screenshot of each
      "53 days, past your old best of 52.". A record due during quiet hours is held until they
      end, then sent with the day's (or week's) latest number, saying "yesterday" or "last week"
      when its day or week is over. Finding records and sending them (`sendRecordsNow`) are
-     separate steps, so the evening summary (#135) can take them instead. State:
+     separate steps; in summary delivery the evening summary takes them instead. State:
      `{"records": {"sent": [ids], "held": [records]}}`; turning Records off drops what's held.
    - **Streak reminder** (`streakReminder.ts`, with `streakReminder: true`): "Your 40-day
      streak" / "Nothing yet today. It keeps going if you contribute by midnight." Due from 8 PM
@@ -564,9 +565,42 @@ WIDGET_SCREENS=/some/dir npm run test:browser   # also save a screenshot of each
      could wrongly say "nothing yet"), or twice in one local day. One alert push,
      `apns-collapse-id: streak`, with `"thread-id": "streak"`, no category, `"kind":
      "streakReminder"` and `"login"` set to your own login (a tap opens your own view). Sending is
-     its own step (`sendStreakReminder`) for the evening summary (#135) to divert.
+     its own step (`sendStreakReminder`); in summary delivery the evening summary holds it.
+   - **Evening summary** (`summary.ts`, #135): with `delivery: "summary"` (the default, "Passes
+     now, the rest at 9 PM"), close calls, records and the streak reminder are held at their send
+     steps instead of going out; passes and results are unaffected. One alert, "Your day so far",
+     goes out at 21:00 local, or when quiet hours start if that's between noon and 21:00, once a
+     local day, only if something held is still worth saying. The body is short lines joined with
+     " · ": where you stand on today's Board ("#2 today with 41", whenever you have a rank: a
+     visible rival with data, and someone contributed), then each record with the day's latest
+     number, best day before best week before streak ("New best day: 41", "New best week: 186", "Your longest streak yet: 53 days"; a record
+     quiet hours held overnight says "41 yesterday" or "186 last week"), each close call with
+     today's gap ("Close call: 2 to pass odile-m"), and the streak reminder ("Your 40-day streak
+     needs one contribution by midnight"). When it's sent, a close call you've closed, that's no
+     longer close or about someone no longer on your board, a reminder you've answered, anything
+     else from an earlier day, and any kind switched off are dropped; with nothing left, nothing is
+     sent. So a close call or streak reminder first due after the summary went out never arrives,
+     and a record found then goes in the next evening's. The
+     summary isn't held back by quiet hours (their start can be its time); a run more than ten
+     minutes into them sends it passively, without a sound. What was held before switching to
+     Right away still goes out that evening. One alert with `apns-collapse-id: summary`, no
+     category, no `login`; the app opens the Board on a tap:
+
+     ```json
+     {
+       "aps": {
+         "alert": { "title": "Your day so far", "body": "#2 today with 41 · New best day: 41 · Close call: 2 to pass odile-m" },
+         "sound": "default", "thread-id": "summary"
+       },
+       "kind": "summary"
+     }
+     ```
+
+     State: `{"summary": {"settled": "YYYY-MM-DD", "closeCalls": [calls], "streak": reminder |
+     null, "records": [records]}}`, saved with the held kind's own marker; `settled` is the last
+     local day whose summary was settled (sent, or nothing left to send).
    - State lives in one JSON column, `notification_state`, keyed by kind
-     (`{"passes": {"window", "date", "counts"}, "results": {"date"}, "streak": {"date"}}`;
+     (`{"passes": {"window", "date", "counts"}, "results": {"date"}, "streak": {"date"}, "summary": {…}}`;
      `streak.date` is the local day of the last reminder). It's saved before anything is sent, so
      a failure can't send the same notification twice. Later kinds add their own keys and keep the
      ones they don't own.
