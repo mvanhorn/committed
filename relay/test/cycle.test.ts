@@ -384,12 +384,15 @@ describe("rotation", () => {
     await relay.runCycle();
     expect(apns.events()).toEqual([`start:${PTS}`]);
 
+    // Just short of 7.5 hours after that start: nothing. At 7.5 hours: once more. Two cycles on
+    // the boundary rather than a cycle every half hour, which was slow enough to time out under load.
     apns.clear();
-    for (let i = 0; i < 16; i++) {
-      clock.advance(30 * MINUTE);
-      await relay.runCycle();
-    }
-    expect(apns.events()).toEqual([`start:${PTS}`]); // once more, 7.5 hours after the last start
+    clock.advance(7 * HOUR + 25 * MINUTE);
+    await relay.runCycle();
+    expect(apns.events()).toEqual([]);
+    clock.advance(5 * MINUTE);
+    await relay.runCycle();
+    expect(apns.events()).toEqual([`start:${PTS}`]);
   });
 
   it("does nothing without any token", async () => {
