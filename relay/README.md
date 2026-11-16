@@ -505,7 +505,9 @@ WIDGET_SCREENS=/some/dir npm run test:browser   # also save a screenshot of each
      With `rivals` pinned, each pinned rival you're that close behind (even with someone in
      between); with nobody pinned, only the person directly above you (`order`, you first among
      ties). At most one per person per local day (`{"closeCalls": {"date", "sent": [logins]}}`),
-     and none during quiet hours: one still close when they end goes out then. They run with
+     and none during quiet hours: one still close when they end goes out then. None, sent or
+     held, about someone a pass was sent about in the same cycle (`passedThisCycle`): the pass
+     already names them and the gap, and they count as sent for the day. They run with
      `passes: "off"` too. `sendCloseCallsNow` is the immediate-delivery step; in summary delivery
      they're held for the evening summary instead. Each is one alert push,
      `apns-collapse-id: closeCall.<login>`; a tap opens that person's view:
