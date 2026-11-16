@@ -167,24 +167,15 @@ private struct ChallengeFooter: View {
 enum ChallengeShareRenderer {
     /// The story at 1080 × 1920.
     static func image(_ challenge: Challenge, savedAvatars: AvatarCache?) -> UIImage? {
-        let renderer = ImageRenderer(content: ChallengeCard(challenge: challenge, savedAvatars: savedAvatars))
-        renderer.scale = BoardShareFormat.renderScale
-        renderer.isOpaque = true
-        return renderer.uiImage
+        ShareImageRenderer.image(ChallengeCard(challenge: challenge, savedAvatars: savedAvatars))
     }
 
     /// The story as a PNG in a temporary folder, named for the race, for the share sheet. Each
     /// render replaces the last one of the same race.
     static func file(_ challenge: Challenge, savedAvatars: AvatarCache?) throws -> URL {
-        guard let data = image(challenge, savedAvatars: savedAvatars)?.pngData() else {
-            throw CocoaError(.fileWriteUnknown)
-        }
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("challenge-share", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let name = "Committed-challenge-\(challenge.url.pathComponents.suffix(2).joined(separator: "-vs-")).png"
-        let url = directory.appendingPathComponent(name)
-        try data.write(to: url, options: .atomic)
-        return url
+        return try ShareImageRenderer.file(ChallengeCard(challenge: challenge, savedAvatars: savedAvatars),
+                                           folder: "challenge-share", name: name)
     }
 }
 

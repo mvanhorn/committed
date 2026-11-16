@@ -317,24 +317,16 @@ struct BoardShareSquareField: View {
 enum BoardShareRenderer {
     /// The image at `format.pixelSize`.
     static func image(_ snapshot: WidgetSnapshot, style: BoardShareStyle, format: BoardShareFormat) -> UIImage? {
-        let renderer = ImageRenderer(content: BoardShareCard(snapshot: snapshot, style: style, format: format))
-        renderer.scale = BoardShareFormat.renderScale
-        renderer.isOpaque = true
-        return renderer.uiImage
+        ShareImageRenderer.image(BoardShareCard(snapshot: snapshot, style: style, format: format))
     }
 
     /// The image as a PNG in a temporary folder, named for what it shows, for the share sheet. Each
     /// render replaces the last one of the same style and format.
     static func file(_ snapshot: WidgetSnapshot, style: BoardShareStyle, format: BoardShareFormat) throws -> URL {
-        guard let data = image(snapshot, style: style, format: format)?.pngData() else {
-            throw CocoaError(.fileWriteUnknown)
-        }
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("board-share", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let window = (snapshot.state.contributionWindow ?? .daily).shortTitle.replacingOccurrences(of: " ", with: "-")
-        let url = directory.appendingPathComponent("Committed-\(window)-\(style.rawValue)-\(format.rawValue).png")
-        try data.write(to: url, options: .atomic)
-        return url
+        return try ShareImageRenderer.file(BoardShareCard(snapshot: snapshot, style: style, format: format),
+                                           folder: "board-share",
+                                           name: "Committed-\(window)-\(style.rawValue)-\(format.rawValue).png")
     }
 }
 

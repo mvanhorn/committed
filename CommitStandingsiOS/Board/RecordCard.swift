@@ -194,19 +194,12 @@ struct RecordShareCard: View {
 @MainActor
 enum RecordShareRenderer {
     static func image(_ record: PersonalRecords.Broken, login: String?) -> UIImage? {
-        let renderer = ImageRenderer(content: RecordShareCard(record: record, login: login))
-        renderer.scale = BoardShareFormat.renderScale
-        renderer.isOpaque = true
-        return renderer.uiImage
+        ShareImageRenderer.image(RecordShareCard(record: record, login: login))
     }
 
     /// The image as a PNG in a temporary folder, for the share sheet.
     static func file(_ record: PersonalRecords.Broken, login: String?) throws -> URL {
-        guard let data = image(record, login: login)?.pngData() else { throw CocoaError(.fileWriteUnknown) }
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("record-share", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let url = directory.appendingPathComponent("Committed-\(record.kind.rawValue).png")
-        try data.write(to: url, options: .atomic)
-        return url
+        try ShareImageRenderer.file(RecordShareCard(record: record, login: login),
+                                    folder: "record-share", name: "Committed-\(record.kind.rawValue).png")
     }
 }
