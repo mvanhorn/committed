@@ -24,7 +24,7 @@ struct RelayNotificationsConsentView: View {
                         .font(CommittedType.display(30, relativeTo: .largeTitle))
                         .displayTracking(30)
                         .accessibilityAddTraits(.isHeader)
-                    Text("The Committed relay checks public contribution graphs every 5 minutes and tells you when someone passes you, or you pass them, even with Committed closed.")
+                    Text("The Committed relay checks public contribution graphs every 5 minutes and sends the notifications you turn on, even with Committed closed.")
                         .foregroundStyle(Color.soft)
                     VStack(alignment: .leading, spacing: 0) {
                         RelayPoint(text: Text("It receives your GitHub username and the usernames on your board. These are public."),
@@ -33,7 +33,7 @@ struct RelayNotificationsConsentView: View {
                         RelayPoint(text: Text("It never receives your GitHub token. That's sent only to GitHub."),
                                    systemImage: "lock", iconWidth: iconWidth)
                         Divider().overlay(Color.hairline)
-                        RelayPoint(text: Text("It also gets your time zone, your notification choices, and the token Apple uses to deliver notifications to this iPhone."),
+                        RelayPoint(text: Text("It also gets your time zone, your notification choices, the rivals you pinned, and the token Apple uses to deliver notifications to this iPhone."),
                                    systemImage: "bell", iconWidth: iconWidth)
                     }
                     .padding(.horizontal, 16)

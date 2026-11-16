@@ -2,7 +2,8 @@ import SwiftUI
 
 /// Shown once before Live rank first turns on with the Committed relay: what the relay receives
 /// (public usernames) and what it never receives (the GitHub token), and that it also sends relay
-/// notifications (`RelayConsent.currentVersion`). "Not Now" leaves Live rank off.
+/// notifications, with what it receives for them: notification choices, pinned rivals and the
+/// notification token (`RelayConsent.currentVersion`). "Not Now" leaves Live rank off.
 struct LiveRankDisclosureView: View {
     @Environment(AppModel.self) private var model
     @State private var isWorking = false
@@ -30,12 +31,12 @@ struct LiveRankDisclosureView: View {
                         point("It also gets your Live rank Window, time zone, and the tokens that update Live rank on this iPhone.",
                               systemImage: "clock")
                         Divider().overlay(Color.hairline)
-                        point(Text("**Notifications:** the relay checks the same public counts and tells you when someone passes you, even with Committed closed."),
+                        point(Text("**Notifications:** the relay checks the same public counts and sends the notifications you turn on, even with Committed closed. For them it also gets your notification choices, the rivals you pinned, and the token Apple uses to deliver notifications to this iPhone."),
                               systemImage: "bell")
                     }
                     .padding(.horizontal, 16)
                     .tileCard()
-                    Text("Turning off Live rank and notifications, or disconnecting GitHub, deletes this iPhone's registration from the relay.")
+                    Text("Turning off Live rank and every notification, or disconnecting GitHub, deletes this iPhone's registration from the relay.")
                         .font(.footnote)
                         .foregroundStyle(Color.muted)
                 }

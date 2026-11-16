@@ -34,11 +34,16 @@ struct DeliverySection: View {
     static func footer(_ choices: NotificationPreferences, on: Bool) -> String {
         guard on else { return "Turn on a notification to choose how they arrive." }
         guard choices.delivery == .summary else { return "Each notification arrives as it happens." }
-        let summaryTime = choices.summaryTime
-        let when = summaryTime == "21:00"
+        let when = choices.summaryTime == "21:00"
             ? "at 9 PM"
-            : "at \(Self.time(summaryTime)), when quiet hours start"
+            : "at \(summaryClock(choices)), when quiet hours start"
         return "Passes and results arrive as they happen. Close calls, records and the streak reminder come together in one summary \(when)."
+    }
+
+    /// When the evening summary goes out, as the iPhone shows times: "9 PM", or the start of
+    /// quiet hours when that's earlier ("8:30 PM"). About you's lines use it too.
+    static func summaryClock(_ choices: NotificationPreferences) -> String {
+        choices.summaryTime == "21:00" ? "9 PM" : time(choices.summaryTime)
     }
 
     /// "20:30" as the iPhone shows times ("8:30 PM").

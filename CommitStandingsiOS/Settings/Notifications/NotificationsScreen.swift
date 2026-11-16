@@ -25,10 +25,14 @@ struct NotificationsScreen: View {
             form
             #if DEBUG
             .task(id: model.showsRelayNotificationChoices) {
-                // The screenshot fixture's -ScreenshotNotificationsEnd: below-the-fold sections.
-                guard ScreenshotFixture.notificationsScrolledToEnd, model.showsRelayNotificationChoices else { return }
+                // The screenshot fixture's -ScreenshotNotificationsEnd and -ScreenshotNotificationsAboutYou:
+                // below-the-fold sections.
+                guard model.showsRelayNotificationChoices else { return }
+                let target: String? = ScreenshotFixture.notificationsScrolledToEnd ? DeliverySection.id
+                    : ScreenshotFixture.notificationsScrolledToAboutYou ? AboutYouSection.id : nil
+                guard let target else { return }
                 try? await Task.sleep(for: .milliseconds(800))
-                proxy.scrollTo(DeliverySection.id, anchor: .top)
+                proxy.scrollTo(target, anchor: .top)
             }
             #endif
         }
@@ -42,6 +46,7 @@ struct NotificationsScreen: View {
                 if model.showsRelayNotificationChoices {
                     ResultsSection()
                     AboutYouSection()
+                        .id(AboutYouSection.id)
                     DeliverySection()
                         .id(DeliverySection.id)
                     QuietHoursSection()
