@@ -5,6 +5,7 @@ import { runCycle } from "./cycle";
 import { boardState, parseBoardQuery } from "./publicBoard";
 import { parseRaceQuery, raceState } from "./race";
 import type { LiveRankState } from "./liveRank";
+import { stateOnRegistration } from "./notifications";
 import { parsePreferences, type NotificationPreferences } from "./notifications/preferences";
 import { isValidTimeZone } from "./parser";
 import { selfFirst, WINDOWS, type Window } from "./ranking";
@@ -125,6 +126,8 @@ export function createRelay(deps: RelayDeps) {
     // as a visibility change does in RefreshCoordinator.
     const resetBaseline = existing.competitors_json !== JSON.stringify(registration.competitors);
     await store.update(id, registration, resetBaseline, deps.now());
+    const state = stateOnRegistration(existing, registration.notifications, registration.timeZone, deps.now());
+    if (state !== null) await store.saveNotificationState(id, state);
     log("installation_updated", { id, competitors: registration.competitors.length });
     return json(200, { ok: true });
   }

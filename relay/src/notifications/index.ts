@@ -6,7 +6,7 @@ import { notifyCloseCalls } from "./closeCalls";
 import { notifyPasses } from "./passes";
 import { notifyRecords } from "./records";
 import { parsePreferences, type NotificationPreferences } from "./preferences";
-import { notifyResults } from "./results";
+import { notifyResults, settleResultsOnEnable } from "./results";
 import { parseState, type NotificationState } from "./state";
 import { notifyStreakReminder } from "./streakReminder";
 import { notifySummary } from "./summary";
@@ -55,6 +55,25 @@ export async function runNotifications(
   state = await notifyResults(context, state, (next) => saveState(row, next, deps), deps);
   // Last, so anything held in this cycle can go out in it.
   state = await notifySummary(context, state, (next) => saveState(row, next, deps), deps);
+}
+
+/**
+ * The notification state a registration leaves, as JSON, or null when it doesn't change it. Turning
+ * results on (with relay notifications, or by its own switch) settles a morning already past, so
+ * re-enabling in the afternoon doesn't send that morning's result late.
+ */
+export function stateOnRegistration(
+  existing: InstallationRow,
+  next: NotificationPreferences | null,
+  timeZone: string,
+  now: number,
+): string | null {
+  if (!next?.results) return null;
+  const previous = existing.notifications_json ? parsePreferences(JSON.parse(existing.notifications_json)) : null;
+  if (previous !== null && typeof previous !== "string" && previous.results) return null;
+  const state = parseState(existing.notification_state);
+  const settled = settleResultsOnEnable(state, timeZone, next, now);
+  return settled === state ? null : JSON.stringify(settled);
 }
 
 /** State is saved before anything is sent, so a failure mid-send can't send the same thing twice. */

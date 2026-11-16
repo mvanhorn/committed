@@ -115,6 +115,24 @@ function readState(raw: unknown): string | null {
 }
 
 /**
+ * Results just switched on (relay notifications back on after being off, or the Results switch on
+ * again): a morning whose send time has already passed is settled unsent, so it never goes out late.
+ * The cycle can't tell this by itself while relay notifications are off, since it doesn't run then.
+ */
+export function settleResultsOnEnable(
+  state: NotificationState,
+  timeZone: string,
+  preferences: NotificationPreferences,
+  now: number,
+): NotificationState {
+  const today = localDate(now, timeZone);
+  const settled = readState(state.results);
+  if (settled !== null && settled >= today) return state;
+  if (localMinutes(now, timeZone) < sendMinutes(preferences.quietHours)) return state;
+  return { ...state, results: { date: today } satisfies ResultsState };
+}
+
+/**
  * Sends the morning's results once per local day. Results are settled, then saved, before anything
  * is sent. The first look, or the first in more than a day (results or relay notifications were
  * off), settles a morning already past without sending, so turning results on at 3 PM doesn't send

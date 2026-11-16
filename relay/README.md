@@ -528,7 +528,10 @@ WIDGET_SCREENS=/some/dir npm run test:browser   # also save a screenshot of each
      count is missing. Ranked with `order` among the visible people with data, so a tie is
      yours. Skipped with no visible rival or when nobody contributed. The first look, or the
      first after more than a day, settles a morning already past without sending (turning
-     results on at 3 PM doesn't send yesterday's then). Turning `results` off drops its state.
+     results on at 3 PM doesn't send yesterday's then). A registration that turns results on
+     (relay notifications back from `null`, or `results` false → true) past that morning's send
+     time settles the morning too (`stateOnRegistration`), since the cycle doesn't run while
+     notifications are off. Turning `results` off drops its state.
      Each is one alert with `apns-collapse-id: result.daily` or `result.weekly`, no category, and
      `"thread-id": "results"`; the app opens the Board on a tap:
 

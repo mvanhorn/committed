@@ -31,7 +31,7 @@ beforeEach(() => {
 
 async function register(
   notifications: Record<string, unknown> = {},
-  overrides: Partial<{ competitors: string[]; timeZone: string }> = {},
+  overrides: Partial<{ competitors: string[]; timeZone: string; liveRank: boolean; notifications: null }> = {},
 ) {
   const res = await relay.fetch(
     new Request(`https://relay.test/v1/installations/${ID}`, {
@@ -229,6 +229,49 @@ describe("the daily result", () => {
     await runThrough(ny(12, 16));
     clock.seconds = ny(13, 7);
     await runThrough(ny(13, 7, 55));
+    expect(results()).toHaveLength(1);
+  });
+
+  describe("after relay notifications were off, with Live rank keeping the installation", () => {
+    beforeEach(async () => {
+      // Sent this morning, then notifications off for the rest of the day and the next morning.
+      await register({}, { liveRank: true });
+      await runThrough(ny(12, 8, 0));
+      expect(results()).toHaveLength(1);
+      await register({}, { liveRank: true, notifications: null });
+      github.set("me", { "2026-11-12": 20, "2026-11-13": 4 });
+      github.set("alice", { "2026-11-12": 25, "2026-11-13": 6 });
+      clock.seconds = ny(13, 6);
+      await runThrough(ny(13, 9));
+    });
+
+    it("turned back on this afternoon, doesn't send this morning's result late", async () => {
+      clock.seconds = ny(13, 15);
+      await register({}, { liveRank: true });
+      await runThrough(ny(13, 16));
+      expect(results()).toHaveLength(1);
+      clock.seconds = ny(14, 7, 55);
+      await runThrough(ny(14, 8, 0));
+      expect(results()).toHaveLength(2); // the next morning's
+    });
+
+    it("turned back on before the send time, sends that morning's result", async () => {
+      clock.seconds = ny(14, 6);
+      await register({}, { liveRank: true });
+      await runThrough(ny(14, 8, 0));
+      expect(results()).toHaveLength(2);
+    });
+  });
+
+  it("switched off and on after the send time with no cycle between, doesn't send that morning's late", async () => {
+    await register({}, { liveRank: true });
+    await runThrough(ny(12, 8, 0));
+    expect(results()).toHaveLength(1);
+    clock.seconds = ny(13, 6);
+    await register({ results: false }, { liveRank: true });
+    clock.seconds = ny(13, 15);
+    await register({}, { liveRank: true });
+    await runThrough(ny(13, 16));
     expect(results()).toHaveLength(1);
   });
 
