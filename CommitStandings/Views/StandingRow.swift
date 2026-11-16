@@ -239,10 +239,19 @@ struct StandingRow: View {
             delta == 0 ? "" : ", \(delta > 0 ? "up" : "down") \(delta.magnitude) \(delta.magnitude == 1 ? "place" : "places") today"
         } ?? ""
         // A record (Your rivals) is read in the streak's place, as it's drawn there.
-        let streakOrRecord = record.map { record in
-            ", " + (recordSpoken.map { $0.prefix(1).lowercased() + $0.dropFirst() } ?? "record \(record)")
+        let streakOrRecord: String
+        if let record {
+            if let recordSpoken {
+                let lowered: String = recordSpoken.prefix(1).lowercased() + String(recordSpoken.dropFirst())
+                streakOrRecord = ", " + lowered
+            } else {
+                streakOrRecord = ", record \(record)"
+            }
+        } else if hasData, let spokenStreak = StreakLabel.spoken(streak) {
+            streakOrRecord = ", " + spokenStreak
+        } else {
+            streakOrRecord = ""
         }
-            ?? (hasData ? StreakLabel.spoken(streak).map { ", " + $0 } ?? "" : "")
         let trolling = trollDescription.map { ", trolling: \($0)" } ?? ""
         let gap = caption.map { ", " + $0.lowercased() } ?? ""
         return standingDescription + gap + streakOrRecord + movement + trolling
