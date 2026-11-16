@@ -325,6 +325,31 @@ describe("relay notifications: close calls", () => {
       expect(apns.alerts.map((alert) => alert.payload.kind)).toEqual(["closeCall", "pass"]);
     });
 
+    it("says nothing about someone who just passed you: the pass already told you, today", async () => {
+      github.set("me", { "2026-11-05": 31 });
+      github.set("odile-m", { "2026-11-05": 30 });
+      await registerCloseCalls({ notifications: { passes: "everyone" } });
+      await relay.runCycle(); // passes take a baseline; you're ahead, so no close call
+      github.set("odile-m", { "2026-11-05": 33 }); // she passes you and is 2 ahead
+      clock.advance(5 * MINUTE);
+      await relay.runCycle();
+      expect(apns.alerts.map((alert) => alert.payload.kind)).toEqual(["pass"]);
+      clock.advance(5 * MINUTE);
+      await relay.runCycle();
+      expect(apns.alerts.map((alert) => alert.payload.kind)).toEqual(["pass"]);
+    });
+
+    it("still holds a close call for the summary about someone who didn't pass you", async () => {
+      github.set("me", { "2026-11-05": 31 });
+      github.set("odile-m", { "2026-11-05": 30 });
+      await registerCloseCalls({ notifications: { passes: "rivals" }, rivals: [] });
+      await relay.runCycle();
+      github.set("odile-m", { "2026-11-05": 33 }); // a pass, but not about a pinned rival: none sent
+      clock.advance(5 * MINUTE);
+      await relay.runCycle();
+      expect(apns.alerts.map((alert) => alert.payload.kind)).toEqual(["closeCall"]);
+    });
+
     it("never touches a Live Activity", async () => {
       await registerCloseCalls();
       await relay.runCycle();

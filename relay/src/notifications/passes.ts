@@ -108,7 +108,7 @@ export async function notifyPasses(
 
   for (const event of events) {
     if (!row.alert_token) break;
-    await sendAlert(
+    const sent = await sendAlert(
       row,
       {
         aps: {
@@ -124,6 +124,7 @@ export async function notifyPasses(
       // The app's own crossing notifications replace per rival too ("rankchange.<login>").
       { collapseId: `pass.${event.rival}` },
     );
+    if (sent) context.passedThisCycle.add(event.rival);
   }
   return next;
 }

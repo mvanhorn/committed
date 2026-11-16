@@ -72,7 +72,8 @@ export function closeCallCopy(call: CloseCall): { title: string; body: string } 
 /**
  * Sends a close call for each person you're close behind, on the preferences' Window, at most once
  * per person per local day, and never during quiet hours (one still close when they end goes out
- * then). The day's markers are saved before anything is sent.
+ * then), nor about someone a pass was sent about in the same cycle. The day's markers are saved
+ * before anything is sent.
  */
 export async function notifyCloseCalls(
   context: NotificationContext,
@@ -91,12 +92,15 @@ export async function notifyCloseCalls(
   const rivals = (JSON.parse(row.rivals_json) as string[]).filter((login) => competitors.includes(login));
   const last = state.closeCalls;
   const alreadySent = last?.date === today ? last.sent : [];
-  const calls = findCloseCalls(competitors, counts, row.login, preferences.window, rivals).filter(
+  const found = findCloseCalls(competitors, counts, row.login, preferences.window, rivals).filter(
     (call) => !alreadySent.includes(call.rival),
   );
-  if (calls.length === 0) return state;
+  if (found.length === 0) return state;
+  // Someone who passed you in this cycle was just named in that pass ("They're ahead 33–31"): a
+  // close call about them is left out and counts as today's, so it doesn't follow a cycle later.
+  const calls = found.filter((call) => !context.passedThisCycle.has(call.rival));
 
-  const closeCalls: CloseCallsState = { date: today, sent: [...alreadySent, ...calls.map((call) => call.rival)] };
+  const closeCalls: CloseCallsState = { date: today, sent: [...alreadySent, ...found.map((call) => call.rival)] };
   // In summary delivery the evening summary (#135) holds them; otherwise they go now.
   const summary = holdsForSummary(preferences);
   const next = summary ? holdCloseCalls({ ...state, closeCalls }, calls, today) : { ...state, closeCalls };

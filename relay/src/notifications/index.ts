@@ -32,6 +32,8 @@ export interface NotificationContext {
   data: ReadonlyMap<string, LoginData>;
   /** Unix seconds of this cycle. */
   now: number;
+  /** Rivals a pass notification was sent about in this cycle: no close call repeats it. */
+  passedThisCycle: Set<string>;
 }
 
 export async function runNotifications(
@@ -43,7 +45,7 @@ export async function runNotifications(
   if (!row.notifications_json || !row.alert_token) return;
   const preferences = parsePreferences(JSON.parse(row.notifications_json));
   if (typeof preferences === "string") return;
-  const context: NotificationContext = { row, preferences, data, now };
+  const context: NotificationContext = { row, preferences, data, now, passedThisCycle: new Set() };
   let state: NotificationState = parseState(row.notification_state);
 
   state = await notifyPasses(context, state, (next) => saveState(row, next, deps), deps);
