@@ -58,8 +58,8 @@ extension EnvironmentValues {
 /// called out on the chart. Before
 /// their count loads it says it's waiting. Your own view adds the private-contributions tip
 /// (`privateTip`, which each platform styles) and what the number can't show. A host can put its
-/// own controls right under the race card (`raceAccessory`: the iPhone's Challenge); the Mac puts
-/// none.
+/// own views right under the race card (`raceAccessory`: the iPhone's Challenge and Weekly record,
+/// each laid out as its own row); the Mac puts none.
 ///
 /// The host scrolls it and sets its width; this view has no platform-only types. A host can add a
 /// section under the stats (`underStats`): the iPhone puts Your records there on your own view.
@@ -110,12 +110,6 @@ struct PersonViewContent<Tip: View, RaceAccessory: View, UnderStats: View>: View
                         // Beside the card, not in it: the card reads as one VoiceOver element.
                         raceAccessory
                     }
-                    #if os(iOS)
-                    // The iPhone's Weekly record, under Your race (`WeeklyRecordCard`, iPhone app only).
-                    if let rivalry = person.rivalry {
-                        WeeklyRecordCard(record: rivalry, login: person.login)
-                    }
-                    #endif
                     stats(days)
                     underStats
                 }

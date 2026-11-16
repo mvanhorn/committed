@@ -56,6 +56,11 @@ struct PersonScreen: View {
                 if let challenge = model.challenge(for: person) {
                     ChallengeButton(challenge: challenge, person: person)
                 }
+                // The Weekly record, under Your race. A rivalry needs both calendars, as the race
+                // does, so it's never without the race card above it.
+                if let rivalry = person.rivalry {
+                    WeeklyRecordCard(record: rivalry, login: person.login)
+                }
             } underStats: {
                 if person.isYou, let records {
                     YourRecordsSection(records: records)
