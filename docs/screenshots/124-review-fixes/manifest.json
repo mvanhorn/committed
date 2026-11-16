@@ -1,7 +1,7 @@
 {
   "device": "iPhone Duo Simulator (shared persistent Duo 94D56458-B90B-484A-BA5E-16748D2CBEE5), closed, portrait",
   "os": "iOS 27.1",
-  "notes": "Runtime captures, not renders, for the spec #124 review fixes on review/124-fixes (items 1, 2, 4, 5). The app has one (dark) appearance. Not captured: the open iPhone Duo, accessibility text sizes, light mode on the site, the Weekly record card after moving into raceAccessory (#17; no layout change intended, covered by the full iPhone suite only), and share images after the ShareImageRenderer refactor (#18; covered by BoardShareTests).",
+  "notes": "Runtime captures, not renders, for the spec #124 review fixes on review/124-fixes (items 1, 2, 4, 5). The app has one (dark) appearance. Not captured: the open iPhone Duo, accessibility text sizes, light mode on the site, and share images after the ShareImageRenderer refactor (#18; covered by BoardShareTests).",
   "screenshots": [
     {
       "file": "relay-sheet.png",
@@ -96,6 +96,15 @@
       "notes": "next start of this commit's production build, localhost, T3 in-app browser, 1280 \u00d7 1834 viewport scrolled to the relay section. No before capture (previous text in git).",
       "device": "T3 in-app browser (Chromium), desktop 1280 px",
       "os": "macOS 27"
+    },
+    {
+      "file": "person-weekly-record.png",
+      "caption": "odile-m's view after #17: the Weekly record card, now injected through the iPhone's raceAccessory slot, still sits under Your race and Challenge with the same spacing",
+      "capture": {
+        "sourceCommit": "9bb4cc7eb8fe441200a246443d1c208890bf591e",
+        "fixture": true
+      },
+      "notes": "Same capture build and device as the other iPhone captures. Launched with -ScreenshotFixture -ScreenshotDate 2026-11-16T17:00:00Z -ScreenshotPerson odile-m -RelayDisclosureAccepted -RelayNotificationsAccepted (#129's flags plus the accepted relay sheets, since this build has a relay URL). Before: docs/screenshots/129-rivalry-record/person-weekly-record.png (no Challenge there: captured before #136)."
     }
   ]
 }
