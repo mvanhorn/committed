@@ -598,7 +598,8 @@ describe("relay notifications: passes", () => {
     expect(push.token).toBe(ALERT);
     expect(push.environment).toBe("production");
     expect(push.priority).toBe(10);
-    expect(push.collapseId).toBe("pass.alice");
+    // No collapse id: each crossing is its own notification, none replaces another (spec #124).
+    expect(push.collapseId).toBeUndefined();
     expect(push.payload).toEqual({
       aps: {
         alert: { title: "😤 alice passed you", body: "They're ahead 7–5. Time to catch up!" },

@@ -485,7 +485,8 @@ WIDGET_SCREENS=/some/dir npm run test:browser   # also save a screenshot of each
      quiet hours is still sent, with `"interruption-level": "passive"` and no `sound`. Later
      kinds use the same check.
    - Each pass is one alert push: `apns-push-type: alert`, `apns-topic: <APNS_BUNDLE_ID>`,
-     priority 10, `apns-collapse-id: pass.<login>`, with the shipped copy from
+     priority 10, no `apns-collapse-id` (one notification per pass: a later crossing with the
+     same person never replaces an unread one), with the shipped copy from
      `NotificationService.copy(for:)`:
 
      ```json

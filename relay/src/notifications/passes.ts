@@ -108,6 +108,8 @@ export async function notifyPasses(
 
   for (const event of events) {
     if (!row.alert_token) break;
+    // No collapse id: "one notification per pass" (spec #124), so a second crossing with the same
+    // person never replaces an unread first one.
     const sent = await sendAlert(
       row,
       {
@@ -121,8 +123,6 @@ export async function notifyPasses(
         login: event.rival,
       },
       deps,
-      // The app's own crossing notifications replace per rival too ("rankchange.<login>").
-      { collapseId: `pass.${event.rival}` },
     );
     if (sent) context.passedThisCycle.add(event.rival);
   }
