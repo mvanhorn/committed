@@ -40,7 +40,12 @@ function calendar(streak: number, today = 0): Record<string, number> {
 }
 
 /** Registers relay notifications in summary delivery (the default), passes and results off. */
-async function registerAt(seconds: number, notifications: Record<string, unknown> = {}, rivals: string[] = []) {
+async function registerAt(
+  seconds: number,
+  notifications: Record<string, unknown> = {},
+  rivals: string[] = [],
+  competitors = ["me", "odile-m", "bob"],
+) {
   clock.seconds = seconds;
   const res = await relay.fetch(
     new Request(`https://relay.test/v1/installations/${ID}`, {
@@ -49,7 +54,7 @@ async function registerAt(seconds: number, notifications: Record<string, unknown
       body: JSON.stringify({
         pushToStartToken: null,
         login: "me",
-        competitors: ["me", "odile-m", "bob"],
+        competitors,
         window: "daily",
         timeZone: "America/New_York",
         apnsEnvironment: "production",
@@ -146,6 +151,48 @@ describe("evening summary", () => {
     // odile-m pulled 13 ahead: past the close-call margin of 3.
     github.set("odile-m", { [TODAY]: 44 });
     expect(await cycleAt(at(21))).toHaveLength(0);
+  });
+
+  it("never names someone no longer on your board", async () => {
+    github.set("me", { [TODAY]: 31 });
+    github.set("odile-m", { [TODAY]: 33 });
+    github.set("bob", { [TODAY]: 1 });
+    await registerAt(at(18), { closeCalls: true, records: false });
+    expect(await cycleAt(at(18, 5))).toHaveLength(0);
+
+    // You hid odile-m: the board the relay has no longer includes them.
+    await registerAt(at(19), { closeCalls: true, records: false }, [], ["me", "bob"]);
+    expect(await cycleAt(at(21))).toHaveLength(0);
+  });
+
+  it("says a best week with its latest number, and lists records day, week, streak", async () => {
+    // A best week of 10 (Oct 26–27, its best day 6); this week reaches 11 today, with no best day.
+    github.set("me", { "2026-10-26": 6, "2026-10-27": 4, "2026-11-02": 3, "2026-11-03": 3, [TODAY]: 5 });
+    github.set("odile-m", { [TODAY]: 3 });
+    github.set("bob", { [TODAY]: 1 });
+    await registerAt(at(10));
+    expect(await cycleAt(at(10, 5))).toHaveLength(0);
+    // Later, 7 today: past the old best day of 6 too, found after the best week but listed first.
+    github.set("me", { "2026-10-26": 6, "2026-10-27": 4, "2026-11-02": 3, "2026-11-03": 3, [TODAY]: 7 });
+    await cycleAt(at(21));
+    expect(summaries().map((alert) => alert.payload.aps.alert.body)).toEqual([
+      "#1 today with 7 · New best day: 7 · New best week: 13",
+    ]);
+  });
+
+  it("says a longest streak in days", async () => {
+    // A 7-day run in October; today makes this run 8 days, 2 a day (no best day or week).
+    const days: Record<string, number> = {};
+    for (let day = 1; day <= 7; day += 1) days[`2026-10-0${day}`] = 2;
+    for (let back = 0; back < 8; back += 1) days[addDays(TODAY, -back)] = 2;
+    github.set("me", days);
+    github.set("odile-m", { [TODAY]: 3 });
+    github.set("bob", { [TODAY]: 1 });
+    await registerAt(at(10));
+    await cycleAt(at(21));
+    expect(summaries().map((alert) => alert.payload.aps.alert.body)).toEqual([
+      "#2 today with 2 · Your longest streak yet: 8 days",
+    ]);
   });
 
   it("sends nothing when nothing was held", async () => {

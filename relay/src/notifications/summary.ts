@@ -150,7 +150,9 @@ export function summaryLines(context: NotificationContext, summary: SummaryState
   const items: string[] = [];
 
   if (preferences.records) {
-    for (const held of summary.records) {
+    // In the order the app lists them: best day, best week, longest streak.
+    const byKind = [...summary.records].sort((a, b) => RECORD_ORDER.indexOf(a.kind) - RECORD_ORDER.indexOf(b.kind));
+    for (const held of byKind) {
       if (held.day < yesterday) continue;
       const record = mine ? latestRecord(held, mine.days, today) : held;
       items.push(recordLine(record, today));
@@ -167,7 +169,8 @@ export function summaryLines(context: NotificationContext, summary: SummaryState
       return counts[window]!;
     };
     for (const call of summary.closeCalls) {
-      if (call.date !== today) continue;
+      // Someone no longer on your board (hidden or removed) is never mentioned.
+      if (call.date !== today || !competitors.includes(call.rival)) continue;
       const current = countsIn(call.window);
       const theirs = current[call.rival] ?? call.rivalContributions;
       const yours = current[row.login] ?? call.myContributions;
@@ -190,6 +193,8 @@ export function summaryLines(context: NotificationContext, summary: SummaryState
   const standing = finish(competitorsOf(row), row.login, data, "daily", today);
   return standing ? [`#${standing.rank} today with ${standing.mine.toLocaleString("en-US")}`, ...items] : items;
 }
+
+const RECORD_ORDER: readonly DueRecord["kind"][] = ["bestDay", "bestWeek", "longestStreak"];
 
 /** "New best day: 41", "New best week: 186", "Your longest streak yet: 53 days". */
 function recordLine(record: DueRecord, today: string): string {

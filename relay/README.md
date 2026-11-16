@@ -573,13 +573,14 @@ WIDGET_SCREENS=/some/dir npm run test:browser   # also save a screenshot of each
      local day, only if something held is still worth saying. The body is short lines joined with
      " · ": where you stand on today's Board ("#2 today with 41", whenever you have a rank: a
      visible rival with data, and someone contributed), then each record with the day's latest
-     number ("New best day: 41", "New best week: 186", "Your longest streak yet: 53 days"; a record
+     number, best day before best week before streak ("New best day: 41", "New best week: 186", "Your longest streak yet: 53 days"; a record
      quiet hours held overnight says "41 yesterday" or "186 last week"), each close call with
      today's gap ("Close call: 2 to pass odile-m"), and the streak reminder ("Your 40-day streak
-     needs one contribution by midnight"). When it's sent, a close call you've closed or that's no
-     longer close, a reminder you've answered, anything else from an earlier day, and any kind
-     switched off are dropped; with nothing left, nothing is sent. So a close call found after the
-     summary went out never arrives, and a record found then goes in the next evening's. The
+     needs one contribution by midnight"). When it's sent, a close call you've closed, that's no
+     longer close or about someone no longer on your board, a reminder you've answered, anything
+     else from an earlier day, and any kind switched off are dropped; with nothing left, nothing is
+     sent. So a close call or streak reminder first due after the summary went out never arrives,
+     and a record found then goes in the next evening's. The
      summary isn't held back by quiet hours (their start can be its time); a run more than ten
      minutes into them sends it passively, without a sound. What was held before switching to
      Right away still goes out that evening. One alert with `apns-collapse-id: summary`, no
