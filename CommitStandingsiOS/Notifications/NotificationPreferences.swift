@@ -28,7 +28,13 @@ struct NotificationPreferences: Codable, Equatable, Sendable {
 
     /// The Window passes and close calls are judged on.
     var window: ContributionWindow = .daily
-    var passes: Passes = .everyone
+    var passes: Passes = .everyone {
+        didSet { if passes != .off { passesPeople = passes } }
+    }
+    /// Who passes are about while the Passes switch is on (Everyone or Pinned rivals), kept while
+    /// it's off so turning it back on brings the same choice back (`turnPassesOn`). Saved on this
+    /// iPhone only: the relay's object has no such key, so it's never sent.
+    private(set) var passesPeople: Passes = .everyone
     var closeCalls = false
     /// Daily and weekly results.
     var results = true
@@ -42,7 +48,13 @@ struct NotificationPreferences: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case window, passes, closeCalls, results, records, streakReminder, delivery, quietHours
+        /// Local storage only (`savingOnThisIPhone`).
+        case passesPeople
     }
+
+    /// Set in an encoder's `userInfo` for the copy saved on this iPhone, which keeps
+    /// `passesPeople`; the relay's encoding leaves it out.
+    static let savingOnThisIPhone = CodingUserInfoKey(rawValue: "NotificationPreferences.savingOnThisIPhone")!
 
     /// Anything missing (choices saved before a later version added them) takes its default.
     init(from decoder: any Decoder) throws {
@@ -50,6 +62,8 @@ struct NotificationPreferences: Codable, Equatable, Sendable {
         let defaults = NotificationPreferences()
         window = try container.decodeIfPresent(ContributionWindow.self, forKey: .window) ?? defaults.window
         passes = try container.decodeIfPresent(Passes.self, forKey: .passes) ?? defaults.passes
+        passesPeople = try container.decodeIfPresent(Passes.self, forKey: .passesPeople)
+            ?? (passes == .off ? defaults.passesPeople : passes)
         closeCalls = try container.decodeIfPresent(Bool.self, forKey: .closeCalls) ?? defaults.closeCalls
         results = try container.decodeIfPresent(Bool.self, forKey: .results) ?? defaults.results
         records = try container.decodeIfPresent(Bool.self, forKey: .records) ?? defaults.records
@@ -71,6 +85,9 @@ struct NotificationPreferences: Codable, Equatable, Sendable {
         try container.encode(streakReminder, forKey: .streakReminder)
         try container.encode(delivery, forKey: .delivery)
         try container.encode(quietHours, forKey: .quietHours)
+        if encoder.userInfo[Self.savingOnThisIPhone] as? Bool == true {
+            try container.encode(passesPeople, forKey: .passesPeople)
+        }
     }
 }
 
@@ -84,6 +101,11 @@ extension NotificationPreferences {
     /// At least one kind of notification is on: relay notifications are on only then.
     var anyKindOn: Bool {
         passes != .off || Self.kindSwitches.contains { self[keyPath: $0] }
+    }
+
+    /// The Passes switch back on, about the same people as before it went off.
+    mutating func turnPassesOn() {
+        passes = passesPeople == .off ? .everyone : passesPeople
     }
 
     /// Every kind off (Passes too), as the switches read before any is turned on.
@@ -138,7 +160,9 @@ final class UserDefaultsNotificationPreferences: NotificationPreferencesStoring 
     func save(_ preferences: NotificationPreferences, account: String) {
         var all = all
         all[account] = preferences
-        defaults.set(try? JSONEncoder().encode(all), forKey: key)
+        let encoder = JSONEncoder()
+        encoder.userInfo[NotificationPreferences.savingOnThisIPhone] = true
+        defaults.set(try? encoder.encode(all), forKey: key)
     }
 }
 

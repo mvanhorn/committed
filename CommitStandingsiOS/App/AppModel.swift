@@ -475,7 +475,8 @@ final class AppModel {
     func leaderboardNotificationsChanged(_ enabled: Bool) async {
         if enabled {
             await notificationSwitchTurnedOn(isPasses: true) { choices in
-                if choices.passes == .off { choices.passes = .everyone }
+                // Back on about the same people (Everyone or Pinned rivals) as before it went off.
+                if choices.passes == .off { choices.turnPassesOn() }
             }
             return
         }

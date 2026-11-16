@@ -340,6 +340,21 @@ struct RelayNotificationsTests {
         #expect(lastNotifications??.preferences.results == false)
     }
 
+    @Test func passesBackOnKeepsPinnedRivals() async {
+        agreedToRelayNotifications()
+        let (model, _) = makeModel(notificationsOn: true)
+        await model.sceneDidBecomeActive()
+        await model.setNotificationChoice(\.passes, .rivals)
+
+        await model.leaderboardNotificationsChanged(false)
+        #expect(lastNotifications??.preferences.passes == .off)
+
+        // Back on: still about your pinned rivals, not reset to Everyone.
+        await model.leaderboardNotificationsChanged(true)
+        #expect(model.notificationChoices.passes == .rivals)
+        #expect(lastNotifications??.preferences.passes == .rivals)
+    }
+
     @Test func deniedPermissionChangesNothing() async {
         agreedToRelayNotifications()
         let (model, _) = makeModel(permission: false)
@@ -755,6 +770,23 @@ struct NotificationPreferencesTests {
         let reloaded = UserDefaultsNotificationPreferences(defaults: defaults)
         #expect(reloaded.load(account: "me") == mine)
         #expect(reloaded.load(account: "ada") == NotificationPreferences())
+    }
+
+    @Test @MainActor func whoPassesAreAboutIsKeptWhileOffButNeverSent() throws {
+        let defaults = UserDefaults(suiteName: "NotificationPreferencesTests.\(UUID().uuidString)")!
+        var mine = NotificationPreferences()
+        mine.passes = .rivals
+        mine.passes = .off
+        UserDefaultsNotificationPreferences(defaults: defaults).save(mine, account: "me")
+
+        var reloaded = UserDefaultsNotificationPreferences(defaults: defaults).load(account: "me")
+        // What the relay hears: its eight keys, passes off, nothing about the remembered choice.
+        let object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(reloaded)) as? [String: Any])
+        #expect(object.count == 8)
+        #expect(object["passes"] as? String == "off")
+
+        reloaded.turnPassesOn()
+        #expect(reloaded.passes == .rivals)
     }
 
     @Test func relayConsentFrom105ReadsAsTheEarlierSheet() throws {
