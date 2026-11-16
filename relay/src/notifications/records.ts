@@ -5,7 +5,8 @@ import { sendAlert } from "./alerts";
 import type { NotificationContext, NotificationDeps } from "./index";
 import { isQuietHours } from "./quietHours";
 import type { NotificationState } from "./state";
-import { holdRecords, holdsForSummary } from "./summary";
+import { formatCount } from "./format";
+import { holdRecords, holdsForSummary } from "./summaryHold";
 
 /**
  * Records (#134): a TypeScript port of the best day, best week and longest streak in
@@ -266,32 +267,62 @@ export async function sendRecordsNow(
   }
 }
 
+/** Each record's name: the notification's title and the summary line's start. */
+const RECORD_NAMES: Record<RecordKind, string> = {
+  bestDay: "New best day",
+  bestWeek: "New best week",
+  longestStreak: "Your longest streak yet",
+};
+
 /**
- * The record's copy as of the local day `today`. A record held overnight by quiet hours says when
- * it was set: "yesterday", or "last week" for a week that has ended.
+ * What both the notification and the summary line say about a due record, as of the local day
+ * `today`: its name, its number, and whether its day or week is over (a record quiet hours held
+ * overnight: "yesterday", or "last week" for a best week set on Sunday). `isStillDue` drops
+ * anything older, so nothing else can be due.
  */
+function describe(record: DueRecord, today: string): { name: string; value: string; past: boolean } {
+  const past = record.kind === "bestWeek" ? mondayOf(record.day) !== mondayOf(today) : record.day !== today;
+  return { name: RECORD_NAMES[record.kind], value: formatCount(record.value), past };
+}
+
+/** The record's notification: "New best day" / "41 today. Your old best was 33, on March 4." */
 export function recordCopy(record: DueRecord, today: string): { title: string; body: string } {
-  const value = record.value.toLocaleString("en-US");
-  const old = record.oldBest.value.toLocaleString("en-US");
+  const { name, value, past } = describe(record, today);
+  const old = formatCount(record.oldBest.value);
   switch (record.kind) {
-    case "bestDay": {
-      const when =
-        record.day === today ? "today" : record.day === addDays(today, -1) ? "yesterday" : `on ${longDate(record.day)}`;
-      return { title: "New best day", body: `${value} ${when}. Your old best was ${old}, on ${longDate(record.oldBest.first)}.` };
-    }
-    case "bestWeek": {
-      const monday = mondayOf(record.day);
-      const when =
-        monday === mondayOf(today)
-          ? "so far this week"
-          : monday === addDays(mondayOf(today), -7)
-            ? "last week"
-            : `the week of ${longDate(monday)}`;
-      return { title: "New best week", body: `${value} ${when}. Your old best was ${old}.` };
-    }
+    case "bestDay":
+      return { title: name, body: `${value} ${past ? "yesterday" : "today"}. Your old best was ${old}, on ${longDate(record.oldBest.first)}.` };
+    case "bestWeek":
+      return { title: name, body: `${value} ${past ? "last week" : "so far this week"}. Your old best was ${old}.` };
     case "longestStreak":
-      return { title: "Your longest streak yet", body: `${value} days, past your old best of ${old}.` };
+      return { title: name, body: `${value} days, past your old best of ${old}.` };
   }
+}
+
+/** The record's line in the evening summary: "New best day: 41", "New best week: 186 last week", "Your longest streak yet: 53 days". */
+export function recordLine(record: DueRecord, today: string): string {
+  const { name, value, past } = describe(record, today);
+  switch (record.kind) {
+    case "bestDay":
+      return `${name}: ${value}${past ? " yesterday" : ""}`;
+    case "bestWeek":
+      return `${name}: ${value}${past ? " last week" : ""}`;
+    case "longestStreak":
+      return `${name}: ${value} days`;
+  }
+}
+
+const RECORD_ORDER: readonly RecordKind[] = ["bestDay", "bestWeek", "longestStreak"];
+
+/**
+ * The evening summary's lines for the records it holds, as of `today`: in the order the app lists
+ * them (best day, best week, longest streak), each still due and with its latest number.
+ */
+export function recordSummaryLines(held: readonly DueRecord[], days: Days | undefined, today: string): string[] {
+  return [...held]
+    .sort((a, b) => RECORD_ORDER.indexOf(a.kind) - RECORD_ORDER.indexOf(b.kind))
+    .filter((record) => isStillDue(record, today))
+    .map((record) => recordLine(days ? latestRecord(record, days, today) : record, today));
 }
 
 /** A held record's number brought up to date: its day's count, or its week's total through today. */

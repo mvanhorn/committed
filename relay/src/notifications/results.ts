@@ -4,6 +4,7 @@ import { addDays, mondayOf, order, type Window } from "../ranking";
 import { sendAlert } from "./alerts";
 import type { NotificationContext, NotificationDeps } from "./index";
 import type { NotificationPreferences } from "./preferences";
+import { formatCount } from "./format";
 import { isQuietHours, localMinutes, timeMinutes } from "./quietHours";
 import type { NotificationState } from "./state";
 
@@ -85,14 +86,14 @@ export function weeklyCopy(result: Finish): { title: string; body: string } {
 
 /** "41 contributions, 8 ahead of odile-m." — or "level with" on a tie, which counts for you. */
 function lead({ mine, other }: Finish): string {
-  const count = `${mine} ${mine === 1 ? "contribution" : "contributions"}`;
+  const count = `${formatCount(mine)} ${mine === 1 ? "contribution" : "contributions"}`;
   const gap = mine - other.contributions;
-  return gap === 0 ? `${count}, level with ${other.login}.` : `${count}, ${gap} ahead of ${other.login}.`;
+  return gap === 0 ? `${count}, level with ${other.login}.` : `${count}, ${formatCount(gap)} ahead of ${other.login}.`;
 }
 
 /** "odile-m won with 41. You had 33." */
 function trail({ mine, other }: Finish): string {
-  return `${other.login} won with ${other.contributions}. You had ${mine}.`;
+  return `${other.login} won with ${formatCount(other.contributions)}. You had ${formatCount(mine)}.`;
 }
 
 /** Minutes after local midnight results go out: when quiet hours end, or 8 AM without them. */

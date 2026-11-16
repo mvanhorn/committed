@@ -5,7 +5,8 @@ import { sendAlert } from "./alerts";
 import type { NotificationContext, NotificationDeps } from "./index";
 import { isQuietHours } from "./quietHours";
 import type { CloseCallsState, NotificationState } from "./state";
-import { holdCloseCalls, holdsForSummary } from "./summary";
+import { formatCount } from "./format";
+import { holdCloseCalls, holdsForSummary, type SummaryState } from "./summaryHold";
 
 /**
  * Close calls (#132): you're a few contributions behind someone directly above you, in the
@@ -64,9 +65,43 @@ const WINDOW_NAMES: Record<Window, string> = { daily: "Today", weekly: "7 days",
 /** "Close call: 2 to pass odile-m" / "You're at 31, they're at 33 · Today". */
 export function closeCallCopy(call: CloseCall): { title: string; body: string } {
   return {
-    title: `Close call: ${call.toPass} to pass ${call.rival}`,
-    body: `You're at ${call.myContributions}, they're at ${call.rivalContributions} · ${WINDOW_NAMES[call.window]}`,
+    title: `Close call: ${formatCount(call.toPass)} to pass ${call.rival}`,
+    body: `You're at ${formatCount(call.myContributions)}, they're at ${formatCount(call.rivalContributions)} · ${WINDOW_NAMES[call.window]}`,
   };
+}
+
+/**
+ * The evening summary's lines for the close calls it holds, as of `today`, each with today's gap
+ * and worded as the notification's title. Left out: one found on an earlier day, someone no longer
+ * on your board (hidden or removed), and one you've since closed or that's no longer close.
+ */
+export function closeCallSummaryLines(
+  context: NotificationContext,
+  held: SummaryState["closeCalls"],
+  today: string,
+): string[] {
+  const { row, data } = context;
+  const competitors = competitorsOf(row);
+  const counts: Partial<Record<Window, Record<string, number>>> = {};
+  const countsIn = (window: Window) => {
+    counts[window] ??= Object.fromEntries(
+      Object.entries(standingsFor(competitors, data, window, today)).map(([login, standing]) => [login, standing.contributions]),
+    );
+    return counts[window]!;
+  };
+  const lines: string[] = [];
+  for (const call of held) {
+    if (call.date !== today || !competitors.includes(call.rival)) continue;
+    const current = countsIn(call.window);
+    const rivalContributions = current[call.rival] ?? call.rivalContributions;
+    const myContributions = current[row.login] ?? call.myContributions;
+    const toPass = rivalContributions - myContributions;
+    // Still behind, and still close.
+    if (toPass >= 1 && toPass <= closeCallMargin(rivalContributions)) {
+      lines.push(closeCallCopy({ ...call, toPass, myContributions, rivalContributions }).title);
+    }
+  }
+  return lines;
 }
 
 /**

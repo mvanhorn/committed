@@ -605,7 +605,12 @@ WIDGET_SCREENS=/some/dir npm run test:browser   # also save a screenshot of each
 
      State: `{"summary": {"settled": "YYYY-MM-DD", "closeCalls": [calls], "streak": reminder |
      null, "records": [records]}}`, saved with the held kind's own marker; `settled` is the last
-     local day whose summary was settled (sent, or nothing left to send).
+     local day whose summary was settled (sent, or nothing left to send). The kinds hold through
+     `summaryHold.ts` (which imports nothing from them but types), and each renders its own
+     summary line (`recordSummaryLines`, `closeCallSummaryLines`, `streakReminderSummaryLine`),
+     so summary.ts imports the kinds and none imports it back.
+   - Counts in every kind's copy but passes are grouped as the app shows them ("1,204",
+     `format.ts`); pass copy stays exactly the shipped `NotificationService.copy(for:)`.
    - State lives in one JSON column, `notification_state`, keyed by kind
      (`{"passes": {"window", "date", "counts"}, "results": {"date"}, "streak": {"date"}, "summary": {…}}`;
      `streak.date` is the local day of the last reminder). It's saved before anything is sent, so

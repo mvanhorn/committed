@@ -6,7 +6,8 @@ import type { NotificationContext, NotificationDeps } from "./index";
 import type { NotificationPreferences } from "./preferences";
 import { EARLIEST_MINUTES, isQuietHours, localMinutes, timeMinutes } from "./quietHours";
 import type { NotificationState } from "./state";
-import { holdStreakReminder, holdsForSummary } from "./summary";
+import { formatCount } from "./format";
+import { holdStreakReminder, holdsForSummary } from "./summaryHold";
 
 /**
  * The streak reminder (#133, spec #124): "Your 40-day streak" / "Nothing yet today. It keeps going
@@ -50,7 +51,7 @@ export function reminderMinutes(quietHours: NotificationPreferences["quietHours"
 /** The copy, in the design voice: second person, no emoji, never scolding. */
 export function streakReminderCopy(streak: number): { title: string; body: string } {
   return {
-    title: `Your ${streak}-day streak`,
+    title: `Your ${formatCount(streak)}-day streak`,
     body: "Nothing yet today. It keeps going if you contribute by midnight.",
   };
 }
@@ -72,6 +73,22 @@ export function streakReminderDue(context: NotificationContext, state: Notificat
   if (sum(mine.days, "daily", today) > 0) return null;
   const streak = currentStreak(mine.days, today);
   return streak >= 2 ? { streak, date: today } : null;
+}
+
+/**
+ * The evening summary's line for a held reminder, or null: only on its own day, and only while
+ * today still has no contributions, with the streak as long as it now is.
+ */
+export function streakReminderSummaryLine(
+  context: NotificationContext,
+  held: StreakReminder | null,
+  today: string,
+): string | null {
+  if (!held || held.date !== today) return null;
+  const mine = context.data.get(context.row.login);
+  if (mine && sum(mine.days, "daily", today) > 0) return null;
+  const days = mine ? Math.max(currentStreak(mine.days, today), held.streak) : held.streak;
+  return `Your ${formatCount(days)}-day streak needs one contribution by midnight`;
 }
 
 /** The kind's step in the cycle: marks the day, then sends the reminder right away. */
