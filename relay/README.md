@@ -558,7 +558,10 @@ WIDGET_SCREENS=/some/dir npm run test:browser   # also save a screenshot of each
      "186 so far this week. Your old best was 171.", "Your longest streak yet" /
      "53 days, past your old best of 52.". A record due during quiet hours is held until they
      end, then sent with the day's (or week's) latest number, saying "yesterday" or "last week"
-     when its day or week is over. Finding records and sending them (`sendRecordsNow`) are
+     when its day or week is over. A held record goes stale (`isStillDue`) once the day after it
+     has passed, or for a best week once its week and the day after it have; stale records
+     (held while relay notifications were off, say) are dropped, never sent late, and the
+     evening summary drops them the same way. Finding records and sending them (`sendRecordsNow`) are
      separate steps; in summary delivery the evening summary takes them instead. State:
      `{"records": {"sent": [ids], "held": [records]}}`; turning Records off drops what's held.
    - **Streak reminder** (`streakReminder.ts`, with `streakReminder: true`): "Your 40-day

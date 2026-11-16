@@ -1,12 +1,11 @@
 import { competitorsOf, standingsFor } from "../board";
 import { currentStreak, localDate, sum } from "../parser";
-import { addDays } from "../ranking";
 import { sendAlert } from "./alerts";
 import { closeCallMargin, type CloseCall } from "./closeCalls";
 import type { NotificationContext, NotificationDeps } from "./index";
 import type { NotificationPreferences } from "./preferences";
 import { isQuietHours, localMinutes } from "./quietHours";
-import { latestRecord, mondayOf, type DueRecord } from "./records";
+import { isStillDue, latestRecord, mondayOf, type DueRecord } from "./records";
 import { finish } from "./results";
 import type { NotificationState } from "./state";
 import type { StreakReminder } from "./streakReminder";
@@ -28,7 +27,8 @@ import type { StreakReminder } from "./streakReminder";
  *   the streak reminder.
  * - Lines are brought up to date when it's sent. Dropped: a close call you've since closed or
  *   that's no longer close, a streak reminder you've since answered, anything from an earlier day
- *   except a record set yesterday (quiet hours held it overnight), and any kind switched off. With
+ *   except a record set yesterday (quiet hours held it overnight) or a best week still in its week
+ *   (`isStillDue`), and any kind switched off. With
  *   nothing left, no summary is sent.
  *
  * Owns the `summary` key of the notification state (see `SummaryState`).
@@ -146,14 +146,13 @@ export async function notifySummary(
 export function summaryLines(context: NotificationContext, summary: SummaryState, today: string): string[] {
   const { row, preferences, data } = context;
   const mine = data.get(row.login);
-  const yesterday = addDays(today, -1);
   const items: string[] = [];
 
   if (preferences.records) {
     // In the order the app lists them: best day, best week, longest streak.
     const byKind = [...summary.records].sort((a, b) => RECORD_ORDER.indexOf(a.kind) - RECORD_ORDER.indexOf(b.kind));
     for (const held of byKind) {
-      if (held.day < yesterday) continue;
+      if (!isStillDue(held, today)) continue;
       const record = mine ? latestRecord(held, mine.days, today) : held;
       items.push(recordLine(record, today));
     }

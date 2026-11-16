@@ -31,7 +31,10 @@ beforeEach(() => {
   github.set("alice", { "2026-11-05": 1 });
 });
 
-async function register(notifications: Record<string, unknown> = {}) {
+async function register(
+  notifications: Record<string, unknown> | null = {},
+  overrides: Partial<{ liveRank: boolean }> = {},
+) {
   const res = await relay.fetch(
     new Request(`https://relay.test/v1/installations/${ID}`, {
       method: "PUT",
@@ -47,7 +50,8 @@ async function register(notifications: Record<string, unknown> = {}) {
         alertToken: ALERT,
         // Passes and results (#131) off, so only records are sent; right away, not in the evening
         // summary (#135).
-        notifications: { passes: "off", results: false, delivery: "immediate", ...notifications },
+        notifications: notifications && { passes: "off", results: false, delivery: "immediate", ...notifications },
+        ...overrides,
       }),
     }),
   );
@@ -186,6 +190,38 @@ describe("relay notifications: records", () => {
       await register({ quietHours: null });
       await relay.runCycle();
       expect(apns.alerts).toHaveLength(1);
+    });
+
+    describe("held while relay notifications are off (Live rank keeps the installation)", () => {
+      /** Holds a record at 11:30 PM on `day`, then turns relay notifications off until `back`. */
+      async function holdThenPause(day: number, back: number) {
+        clock.seconds = ny(day, 23, 30);
+        await register({}, { liveRank: true });
+        await relay.runCycle();
+        await register(null, { liveRank: true });
+        await runAt(ny(day, 23, 35));
+        clock.seconds = back;
+        await register({}, { liveRank: true });
+        await relay.runCycle();
+      }
+
+      it("drops a best day once the day after it has passed", async () => {
+        github.set("me", { "2026-10-20": 33, "2026-10-21": 30, "2026-11-05": 41 });
+        await holdThenPause(5, ny(7, 12));
+        expect(apns.alerts).toHaveLength(0);
+      });
+
+      it("still sends a best week later in its own week", async () => {
+        github.set("me", { "2026-10-20": 50, "2026-11-02": 30, "2026-11-03": 25 });
+        await holdThenPause(3, ny(5, 12));
+        expect(alerts()).toEqual([{ title: "New best week", body: "55 so far this week. Your old best was 50." }]);
+      });
+
+      it("drops a best week once the Monday after it has passed", async () => {
+        github.set("me", { "2026-10-20": 50, "2026-11-02": 30, "2026-11-08": 25 });
+        await holdThenPause(8, ny(10, 12));
+        expect(apns.alerts).toHaveLength(0);
+      });
     });
 
     it("drops a held record when Records is turned off before morning", async () => {

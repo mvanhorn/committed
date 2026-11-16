@@ -196,7 +196,8 @@ const SENT_KEPT = 12;
  * Records (spec #124, "Relay: the notification cycle"): best day, best week and longest streak,
  * each announced the first time it's broken in its day or week, when its old best meets the
  * minimum. Records due during quiet hours wait until they end, then go out with the day's latest
- * number. With Records off, nothing is found and anything held is dropped.
+ * number; one held past its day (or a best week past its week) is dropped (`isStillDue`). With
+ * Records off, nothing is found and anything held is dropped.
  *
  * Finding them (here) and sending them (`sendRecordsNow`) are separate steps: in summary delivery
  * the evening summary (#135) takes the due records instead of sending them right away.
@@ -223,7 +224,8 @@ export async function notifyRecords(
       sent.push(broken.id);
       held.push({ id: broken.id, kind: broken.kind, day: today, value: broken.value, oldBest: broken.oldBest });
     }
-    records = { sent: sent.slice(-SENT_KEPT), held: mine ? held.map((record) => latestRecord(record, mine, today)) : held };
+    const latest = mine ? held.map((record) => latestRecord(record, mine, today)) : held;
+    records = { sent: sent.slice(-SENT_KEPT), held: latest.filter((record) => isStillDue(record, today)) };
   }
 
   const due = records.held.length > 0 && !isQuietHours(now, row.time_zone, preferences.quietHours) ? records.held : [];
@@ -235,6 +237,17 @@ export async function notifyRecords(
   if (summary || JSON.stringify(next.records) !== JSON.stringify(state.records ?? { sent: [], held: [] })) await save(next);
   if (!summary) await sendRecordsNow(row, due, today, deps);
   return next;
+}
+
+/**
+ * A held record still worth announcing on the local day `today`: one set today or yesterday (quiet
+ * hours held it overnight), or a best week whose week isn't over. Anything older, held while
+ * relay notifications were off or the token was missing, is dropped rather than sent late. The
+ * evening summary (#135) follows the same rule for the records it holds.
+ */
+export function isStillDue(record: DueRecord, today: string): boolean {
+  if (record.day >= addDays(today, -1)) return true;
+  return record.kind === "bestWeek" && mondayOf(record.day) === mondayOf(today);
 }
 
 /** Sends each due record as its own alert, now. */
