@@ -84,13 +84,16 @@ enum ScreenshotFixture {
         guard let raw = value(after: "-ScreenshotNotificationResponse"),
               let colon = raw.lastIndex(of: ":") else { return nil }
         let action = String(raw[..<colon]), login = String(raw[raw.index(after: colon)...])
-        let kind = value(after: "-ScreenshotNotificationKind")
-        if kind == "summary" { return DeepLink(notification: ["kind": "summary"], action: action) }
-        if let kind, ["closeCall", "streakReminder"].contains(kind) {
-            return DeepLink(notification: ["kind": kind, "login": login], action: action)
+        let kind = value(after: "-ScreenshotNotificationKind").flatMap(DeepLink.NotificationKind.init(rawValue:)) ?? .pass
+        switch kind {
+        case .summary, .result:
+            return DeepLink(notification: ["kind": kind.rawValue], action: action)
+        case .closeCall, .record, .streakReminder:
+            return DeepLink(notification: ["kind": kind.rawValue, "login": login], action: action)
+        case .pass:
+            return DeepLink(notification: ["kind": kind.rawValue, "login": login, "aps": ["category": DeepLink.passCategory]],
+                            action: action)
         }
-        return DeepLink(notification: ["kind": "pass", "login": login, "aps": ["category": DeepLink.passCategory]],
-                        action: action)
     }
 
     /// `-ScreenshotPersonDay <n>`: the person view's selected bar, instead of today's.
@@ -145,6 +148,11 @@ enum ScreenshotFixture {
     /// below it) once it loads, for captures of sections below the fold.
     static var notificationsScrolledToEnd: Bool {
         ProcessInfo.processInfo.arguments.contains("-ScreenshotNotificationsEnd")
+    }
+
+    /// `-ScreenshotNotificationsAboutYou`: the Notifications screen scrolls to About you once it loads.
+    static var notificationsScrolledToAboutYou: Bool {
+        ProcessInfo.processInfo.arguments.contains("-ScreenshotNotificationsAboutYou")
     }
 
     /// `-ScreenshotNotificationsDenied`: iOS's notification permission reads as denied.

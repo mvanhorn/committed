@@ -15,6 +15,16 @@ enum DeepLink: Equatable, Sendable {
 
     static let scheme = "committed"
 
+    /// The kinds of relay notification, as the payload's `"kind"` names them (relay/src/notifications).
+    enum NotificationKind: String, CaseIterable, Sendable {
+        case pass
+        case closeCall
+        case result
+        case record
+        case streakReminder
+        case summary
+    }
+
     init?(url: URL) {
         guard url.scheme?.lowercased() == Self.scheme,
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
@@ -51,33 +61,31 @@ enum DeepLink: Equatable, Sendable {
     /// Board. Nil for anything else
     /// (another kind, a dismissal, an unknown action), and the app just opens.
     init?(notification userInfo: [AnyHashable: Any], action: String = Self.bodyTapAction) {
-        let kind = userInfo["kind"] as? String
-        // A result and the evening summary have no actions either: tapping one opens the Board.
-        if kind == "result" || kind == "summary" {
+        guard let kind = (userInfo["kind"] as? String).flatMap(NotificationKind.init(rawValue:)) else { return nil }
+        let login = (userInfo["login"] as? String).flatMap(UsernameNormalization.normalize)
+        switch kind {
+        case .result, .summary:
+            // No actions: tapping one opens the Board.
             guard action == Self.bodyTapAction else { return nil }
             self = .board(window: nil)
-            return
-        }
-        let login = (userInfo["login"] as? String).flatMap(UsernameNormalization.normalize)
-        // Close calls, records and streak reminders have no actions: tapping one opens the view of
-        // the login it names (yours, for records and streak reminders).
-        if kind == "closeCall" || kind == "record" || kind == "streakReminder" {
+        case .closeCall, .record, .streakReminder:
+            // No actions: tapping one opens the view of the login it names (yours, for records and
+            // streak reminders).
             guard action == Self.bodyTapAction, let login else { return nil }
             self = .person(login: login)
-            return
-        }
-        guard kind == "pass" else { return nil }
-        switch action {
-        case Self.bodyTapAction:
-            guard let login else { return nil }
-            self = .person(login: login)
-        case Self.shareRaceAction:
-            guard let login else { return nil }
-            self = .challenge(login: login)
-        case Self.openBoardAction:
-            self = .board(window: nil)
-        default:
-            return nil
+        case .pass:
+            switch action {
+            case Self.bodyTapAction:
+                guard let login else { return nil }
+                self = .person(login: login)
+            case Self.shareRaceAction:
+                guard let login else { return nil }
+                self = .challenge(login: login)
+            case Self.openBoardAction:
+                self = .board(window: nil)
+            default:
+                return nil
+            }
         }
     }
 
