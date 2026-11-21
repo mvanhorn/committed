@@ -1,5 +1,7 @@
 import SwiftUI
+#if os(iOS)
 import UIKit
+#endif
 
 // Share the board as an image: one of Committed's widgets, drawn by the widget's own views
 // (`CommittedWidgetViews.swift`), on a square for a feed or a 9:16 story with a headline. It shows
@@ -11,7 +13,7 @@ enum BoardShareStyle: String, CaseIterable, Identifiable, Sendable {
     case board
     /// The medium widget: the person above you, you, and the person below.
     case race
-    /// The small widget: your rank big, your count, and the gap to pass.
+    /// A compact share card with your rank and contribution count.
     case rank
     /// The small Committed Board widget: the leaders, or the top two and your race.
     case list
@@ -101,6 +103,7 @@ struct BoardShareCard: View {
     let snapshot: WidgetSnapshot
     let style: BoardShareStyle
     let format: BoardShareFormat
+    var avatarCache: AvatarCache? = .shared
 
     var body: some View {
         let canvas = format.canvas
@@ -145,7 +148,7 @@ struct BoardShareCard: View {
         .environment(\.avatarFallbackStyle, .committed)
         .environment(\.loadsGitHubAvatars, false)
         // The Sample board's made-up people: initials, never a saved real avatar.
-        .environment(\.savedAvatars, snapshot.savedAvatars)
+        .environment(\.savedAvatars, snapshot.isSampleBoard == true ? nil : avatarCache)
         .environment(\.liveRankIsStale, false)
     }
 
@@ -191,8 +194,65 @@ private struct BoardShareWidget: View {
         switch style {
         case .board: CommittedWidgetLarge(snapshot: snapshot)
         case .race: CommittedWidgetMedium(snapshot: snapshot)
-        case .rank: CommittedWidgetSmall(snapshot: snapshot)
+        case .rank: BoardShareRank(state: snapshot.state)
         case .list: CommittedWidgetBoardSmall(snapshot: snapshot)
+        }
+    }
+}
+
+/// The compact export centers the rank and its heading independently of the trophy and count.
+private struct BoardShareRank: View {
+    let state: LiveRankState
+
+    var body: some View {
+        let ranked = state.rank != nil || state.competitorCount > 1
+        let count = state.contributions.map { "\($0)" } ?? "–"
+        let unit = state.contributions == 1 ? "Contribution" : "Contributions"
+        VStack(alignment: .leading, spacing: 0) {
+            Text(ranked ? heading : unit)
+                .font(CommittedType.display(10, relativeTo: .caption))
+                .foregroundStyle(.white)
+                .accessibilityHidden(true)
+            Text(ranked ? state.rank.map { "#\($0)" } ?? "–" : count)
+                .font(CommittedType.display(54, relativeTo: .largeTitle))
+                .displayTracking(54)
+                .foregroundStyle(ranked ? Color.white : .lime)
+                .accessibilityLabel(ranked ? LiveRankText.rankAccessibility(state) : LiveRankText.countAccessibility(state))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .overlay(alignment: .topTrailing) {
+            TrophyMark(size: 36)
+        }
+        .overlay(alignment: .bottomLeading) {
+            VStack(alignment: .leading, spacing: 3) {
+                if ranked {
+                    HStack(spacing: 6) {
+                        ContributionGrid(size: 12, color: (state.contributions ?? 0) > 0 ? .lime : .muted)
+                        Text("\(count) \(unit)")
+                            .font(CommittedType.numeral(12, relativeTo: .caption))
+                            .foregroundStyle(Color.lime)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(LiveRankText.countAccessibility(state))
+                }
+                if let status = state.emptyStateLine {
+                    Text(status)
+                        .font(CommittedType.numeral(10, relativeTo: .caption))
+                        .foregroundStyle(Color.soft)
+                }
+            }
+            .padding(.leading, 4)
+            .padding(.bottom, 6)
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+    }
+
+    private var heading: String {
+        switch state.contributionWindow ?? .daily {
+        case .daily: "Today’s Rank"
+        case .weekly: "This Week’s Rank"
+        case .monthly: "Last 30 Days Rank"
         }
     }
 }
@@ -315,107 +375,41 @@ struct BoardShareSquareField: View {
 
 @MainActor
 enum BoardShareRenderer {
+    #if os(iOS)
     /// The image at `format.pixelSize`.
     static func image(_ snapshot: WidgetSnapshot, style: BoardShareStyle, format: BoardShareFormat) -> UIImage? {
         ShareImageRenderer.image(BoardShareCard(snapshot: snapshot, style: style, format: format))
     }
 
+    #endif
+
     /// The image as a PNG in a temporary folder, named for what it shows, for the share sheet. Each
     /// render replaces the last one of the same style and format.
-    static func file(_ snapshot: WidgetSnapshot, style: BoardShareStyle, format: BoardShareFormat) throws -> URL {
+    static func file(
+        _ snapshot: WidgetSnapshot,
+        style: BoardShareStyle,
+        format: BoardShareFormat,
+        avatarCache: AvatarCache? = .shared
+    ) throws -> URL {
         let window = (snapshot.state.contributionWindow ?? .daily).shortTitle.replacingOccurrences(of: " ", with: "-")
-        return try ShareImageRenderer.file(BoardShareCard(snapshot: snapshot, style: style, format: format),
-                                           folder: "board-share",
+        let card = BoardShareCard(snapshot: snapshot, style: style, format: format, avatarCache: avatarCache)
+        return try ShareImageRenderer.file(card, folder: "board-share",
                                            name: "Committed-\(window)-\(style.rawValue)-\(format.rawValue).png")
     }
 }
 
-// MARK: - Sheet
-
-/// What the Share button opens: swipe between the widget styles, pick Square or Story, and share.
-struct BoardShareSheet: View {
-    let snapshot: WidgetSnapshot
-    @State private var style: BoardShareStyle = .board
-    @State private var format: BoardShareFormat
-    @State private var sharing: SharedFile?
-    @Environment(\.dismiss) private var dismiss
-
-    init(snapshot: WidgetSnapshot, initialFormat: BoardShareFormat = .square) {
-        self.snapshot = snapshot
-        _format = State(initialValue: initialFormat)
-    }
-
-    private struct SharedFile: Identifiable {
-        let url: URL
-        var id: URL { url }
-    }
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 18) {
-                TabView(selection: $style) {
-                    ForEach(BoardShareStyle.allCases) { style in
-                        BoardSharePreview(snapshot: snapshot, style: style, format: format)
-                            .padding(.horizontal, 24)
-                            .padding(.bottom, 36)
-                            .tag(style)
-                    }
-                }
-                .tabViewStyle(.page(indexDisplayMode: .always))
-                .indexViewStyle(.page(backgroundDisplayMode: .interactive))
-
-                Text(style.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.soft)
-                    .contentTransition(.opacity)
-
-                Picker("Format", selection: $format) {
-                    ForEach(BoardShareFormat.allCases) { format in
-                        Text(format.title).tag(format)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 24)
-
-                Button {
-                    sharing = (try? BoardShareRenderer.file(snapshot, style: style, format: format)).map(SharedFile.init)
-                } label: {
-                    Label("Share", systemImage: "square.and.arrow.up")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(LimeButtonStyle())
-                .padding(.horizontal, 24)
-                .padding(.bottom, 12)
-            }
-            .inkScreen()
-            .navigationTitle("Share board")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
-        // The image alone: no title or caption rides along into the post or message.
-        .sheet(item: $sharing) { file in
-            ShareActivity(items: [file.url])
-                .presentationDetents([.medium, .large])
-                .ignoresSafeArea()
-        }
-    }
-}
-
-/// One page of the carousel: the card itself, scaled to fit the page.
-private struct BoardSharePreview: View {
+/// The card scaled to fit its preview.
+struct BoardSharePreview: View {
     let snapshot: WidgetSnapshot
     let style: BoardShareStyle
     let format: BoardShareFormat
+    var avatarCache: AvatarCache? = .shared
 
     var body: some View {
         GeometryReader { proxy in
             let canvas = format.canvas
             let scale = min(proxy.size.width / canvas.width, proxy.size.height / canvas.height)
-            BoardShareCard(snapshot: snapshot, style: style, format: format)
+            BoardShareCard(snapshot: snapshot, style: style, format: format, avatarCache: avatarCache)
                 .scaleEffect(scale)
                 .frame(width: canvas.width * scale, height: canvas.height * scale)
                 .clipShape(.rect(cornerRadius: 18))

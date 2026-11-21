@@ -79,8 +79,8 @@ extension StandingRowStyle {
             rankFont: CommittedType.numeral(13, relativeTo: .footnote),
             rankColor: .muted,
             rankWidthScale: 1.1,
-            nameFont: .subheadline,
-            selfNameFont: .subheadline.weight(.semibold),
+            nameFont: CommittedType.widgetText(.subheadline, size: 15),
+            selfNameFont: CommittedType.widgetText(.subheadline, size: 15, weight: .semibold),
             countFont: CommittedType.numeral(16, relativeTo: .subheadline),
             selfCountFont: CommittedType.display(16, relativeTo: .subheadline),
             selfCountColor: accent,
@@ -89,7 +89,7 @@ extension StandingRowStyle {
             horizontalPadding: 10,
             verticalPadding: 4,
             accent: accent,
-            badgeFont: .caption2.weight(.bold),
+            badgeFont: CommittedType.widgetText(.caption2, size: 11, weight: .bold),
             badgeForeground: .onLime,
             badgeFillOpacity: 1,
             selfFillOpacity: 0.08,
@@ -97,7 +97,7 @@ extension StandingRowStyle {
             cornerRadius: 10,
             movementUpColor: accent,
             movementDownColor: stale ? .muted : .soft,
-            movementFont: .caption2.weight(.heavy),
+            movementFont: CommittedType.widgetText(.caption2, size: 11, weight: .heavy),
             // Quieter than the counts beside it, like the Board's (`StandingRowStyle.committed`).
             streakFont: CommittedType.numeral(13, relativeTo: .footnote),
             streakColor: stale ? .muted : .soft,
@@ -105,7 +105,7 @@ extension StandingRowStyle {
             streakTextStyle: .footnote,
             // Deep lime like the board's; stale steps down to the squares ramp's dimmest green.
             streakMarkColor: stale ? Color.rowGlyphs[1] : .limeDeep,
-            squares: .shadedSymbol(Color.rowGlyphs)
+            squares: .shadedGrid(Color.rowGlyphs)
         )
     }
 }

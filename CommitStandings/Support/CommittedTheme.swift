@@ -1,8 +1,10 @@
 import SwiftUI
+#if os(macOS)
+import CoreText
+#endif
 
 // The iPhone app's and Live rank's look: the marketing site's ink-and-lime world
-// (`site/app/globals.css`), dark only. Compiled into the iPhone app and the Live rank extension,
-// never the Mac app, which keeps the system look.
+// (`site/app/globals.css`), dark only. The Mac uses it for exported board images.
 
 // MARK: - Palette
 
@@ -101,17 +103,44 @@ enum CommittedType {
 
     /// Headlines and big numbers. Tabular digits so ranks and counts don't jitter as they change.
     static func display(_ size: CGFloat, relativeTo style: Font.TextStyle) -> Font {
-        .custom(displayFace, size: size, relativeTo: style).monospacedDigit()
+        #if os(macOS)
+        _ = registerShareFonts
+        #endif
+        return .custom(displayFace, size: size, relativeTo: style).monospacedDigit()
     }
 
     /// Numbers that sit beside body text.
     static func numeral(_ size: CGFloat, relativeTo style: Font.TextStyle) -> Font {
-        .custom(regularFace, size: size, relativeTo: style).monospacedDigit()
+        #if os(macOS)
+        _ = registerShareFonts
+        #endif
+        return .custom(regularFace, size: size, relativeTo: style).monospacedDigit()
+    }
+
+    #if os(macOS)
+    // iOS registers these through UIAppFonts. Keep registration local to the Mac app process.
+    private static let registerShareFonts: Void = {
+        for face in [regularFace, displayFace] {
+            if let url = Bundle.main.url(forResource: face, withExtension: "ttf") {
+                CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+            }
+        }
+    }()
+    #endif
+
+    /// Widget labels keep Dynamic Type on iPhone. Mac share images match the iPhone's
+    /// default point sizes because named text styles have different sizes on Mac.
+    static func widgetText(_ style: Font.TextStyle, size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        #if os(macOS)
+        .system(size: size, weight: weight)
+        #else
+        .system(style, design: .default, weight: weight)
+        #endif
     }
 
     /// Eyebrows and folios ("CONTRIBUTIONS", "6 PEOPLE · TODAY"): the site's monospace labels
     /// (`font-mono text-[11px] font-medium tracking-[.06em]`), uppercase.
-    static let label = Font.caption2.monospaced().weight(.medium)
+    static let label = widgetText(.caption2, size: 11, weight: .medium).monospaced()
     /// The site's .06em at 11 pt.
     static let labelTracking: CGFloat = 0.7
 }
