@@ -434,6 +434,24 @@ struct RefreshCoordinatorTests {
         await fresh.value
         #expect(store.standing(for: "newcomer", window: .daily) == nil)
     }
+
+    @Test func cancelledRefreshOne_keepsAFailureThatHadNoCount() async throws {
+        let store = StandingsStore(persistence: InMemoryCompetitorPersistence())
+        _ = try store.addSelf(username: "me")
+        _ = try store.addRival(username: "ghost")
+        // The last refresh failed before any count arrived: the row shows the error, not a dash.
+        let prior = Standing(username: "ghost", contributions: 0, window: .daily, lastUpdated: .distantPast,
+                             state: .failed("Not found"))
+        store.updateStanding(prior)
+        let fetcher = StubFetcher(delayNanos: 5_000_000_000)
+        let coord = RefreshCoordinator(store: store, client: fetcher, interval: 9_999)
+
+        let task = Task { await coord.refreshOne(username: "ghost", reason: .manual) }
+        while await fetcher.calls(for: "ghost") == 0 { await Task.yield() }
+        task.cancel()
+        await task.value
+        #expect(store.standing(for: "ghost", window: .daily) == prior)
+    }
 }
 
 private actor ConcurrencyCountingFetcher: ContributionsFetching {

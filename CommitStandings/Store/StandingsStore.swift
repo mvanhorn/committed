@@ -368,12 +368,13 @@ final class StandingsStore {
     }
 
     /// Undo `markLoading` for a refresh that was cut off before its result landed: put back the
-    /// standing from before it started, or drop the placeholder when there was none. A row whose
-    /// result already arrived is left alone.
+    /// standing from before it started (a failure with no count included), or drop the
+    /// placeholder when there was none. A row whose result already arrived is left alone.
     func cancelLoading(username: String, window: ContributionWindow, restoring prior: Standing?) {
         let k = key(username, window)
         guard standings[k]?.state == .loading else { return }
-        guard var restored = prior, restored.lastUpdated != .distantPast else {
+        // No prior, or only another refresh's empty placeholder: nothing real to put back.
+        guard var restored = prior, restored.state != .loading || restored.lastUpdated != .distantPast else {
             standings.removeValue(forKey: k)
             return
         }
