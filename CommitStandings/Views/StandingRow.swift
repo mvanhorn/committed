@@ -489,17 +489,16 @@ struct SkeletonCell: View {
 }
 
 /// The "refreshing" pulse: opacity eases from 1 down to 0.4 and back, 0.85 s each way, worked
-/// out from the time since the pulse began rather than kept alive by a repeating animation. A
-/// repeating SwiftUI animation can't be reliably stopped, kept stacking a new copy on every
-/// refresh, and drove a redraw every frame even with the menu closed.
+/// out from the time since the pulse began. Not a `repeatForever` animation: switching one off
+/// with a nil animation doesn't end it, so it kept redrawing every frame, menu closed or not.
 enum PulsePhase {
     static let period: TimeInterval = 1.7
     static let dimmedOpacity = 0.4
 
     static func opacity(elapsed: TimeInterval) -> Double {
         let cycles = elapsed / period
-        let position = cycles - cycles.rounded(.down) // 0..<1 through one dim-and-back cycle
-        let depth = position < 0.5 ? position * 2 : (1 - position) * 2
+        let fractionOfCycle = cycles - cycles.rounded(.down)
+        let depth = fractionOfCycle < 0.5 ? fractionOfCycle * 2 : (1 - fractionOfCycle) * 2
         let eased = (1 - cos(.pi * depth)) / 2
         return 1 - (1 - dimmedOpacity) * eased
     }

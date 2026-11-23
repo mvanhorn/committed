@@ -10,7 +10,6 @@ struct MenuContentView: View {
     @Binding var shareSnapshot: WidgetSnapshot?
     @State private var showOverflow = false
     @State private var contentHeight: CGFloat?
-    // The menu bar panel's views stay alive while it's closed; this lets them stop all motion.
     @State private var panelVisible = true
     // Persisted so dismissing a version stays dismissed across launches; an empty string
     // (the default) means nothing has been dismissed.
@@ -268,8 +267,12 @@ private struct WindowVisibilityObserver: NSViewRepresentable {
 
     final class ObserverView: NSView {
         var onChange: ((Bool) -> Void)?
-        private var observation: NSObjectProtocol?
+        nonisolated(unsafe) private var observation: NSObjectProtocol?
         private var reported: Bool?
+
+        deinit {
+            if let observation { NotificationCenter.default.removeObserver(observation) }
+        }
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()

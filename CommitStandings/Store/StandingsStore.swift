@@ -369,8 +369,7 @@ final class StandingsStore {
 
     /// Undo `markLoading` for a refresh that was cut off before its result landed: put back the
     /// standing from before it started, or drop the placeholder when there was none. A row whose
-    /// result already arrived is left alone. Without this a cancelled refresh leaves the row
-    /// pulsing as "refreshing" until some later refresh happens to reach it.
+    /// result already arrived is left alone.
     func cancelLoading(username: String, window: ContributionWindow, restoring prior: Standing?) {
         let k = key(username, window)
         guard standings[k]?.state == .loading else { return }
