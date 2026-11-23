@@ -60,6 +60,60 @@ the deck is `app-store-screenshots.json`, and its README lists every source.
 Look at each PNG before committing, then set `sourceCommit` in `manifest.json` to the commit the
 deck came from and run `python3 scripts/screenshot_evidence.py --base origin/main`.
 
+## Newer screens
+
+`AppStoreFeatureScreenTests` renders the screens 1.1 added, from the Sample board with a record set
+today and Ezra Q and Odile M pinned: the Board with Your rivals and the record card, Ezra Q's person
+view, their Challenge story (1080 × 1920), your own view, Share board and People. With `RENDER_DIR`
+set they're written to `screens/feature-*.png` beside the others. Renders, not runtime captures.
+
+`AppStoreListingScreenTests` adds two from the plain Sample board pulled to refresh once (Ari Linden
+#3, just past Ezra Q, 2 behind Odile M): the Board share image itself (`listing-share-story.png`,
+1080 × 1920), the square one sent to a group chat with your rank (`listing-share-message.png`), and the Lock Screen with Committed's accessory widgets and the notifications that
+board sends at that moment, a pass and a close call in the shipped copy, above Live rank
+(`listing-notifications.png`). A test checks the notifications match the board.
+
+## Your real board (local only)
+
+Agents can run the app and render these screens on the owner's real board without a GitHub token.
+Only the roster needs the owner, because GitHub's people calls need a token; the counts come from
+each person's public contribution calendar, read anonymously by the app's own `ContributionsClient`.
+
+1. The owner keeps a roster outside the repo, `~/.config/committed/board.json`:
+
+   ```json
+   { "owner": "addisonk", "people": ["odile-m", "ezra-q"], "hidden": [], "pins": ["ezra-q"] }
+   ```
+
+2. Read everyone's calendar into a snapshot and render its screens into `build/app-store/real/`:
+
+   ```sh
+   TEST_RUNNER_RENDER_DIR="$PWD/build/app-store" \
+   TEST_RUNNER_REAL_BOARD_ROSTER="$HOME/.config/committed/board.json" \
+   TEST_RUNNER_REAL_BOARD_FILE="$HOME/.config/committed/board-snapshot.json" \
+     python3 scripts/ios_check.py ios --only-testing CommitStandingsiOSTests/RealBoardTests
+   ```
+
+   Besides the newer screens it writes `widgets.png` (the Home Screen), `share-story.png` (the
+   Board share image, 1080 × 1920), `share-message.png` (the square one in a group chat) and `notifications.png` (the Lock Screen, with only the
+   notifications that board sends right then). Keep `REAL_BOARD_ROSTER` for screenshots: the Board's
+   "Updated …" line counts from when the calendars were read. Leave it out only to check a render
+   against the saved snapshot without reading GitHub.
+
+3. To use the app on it, launch a Debug build with the snapshot:
+
+   ```sh
+   xcrun simctl launch 94D56458-B90B-484A-BA5E-16748D2CBEE5 com.addisonk.CommitStandings.iOS \
+     -ScreenshotFixture -ScreenshotBoardFile "$HOME/.config/committed/board-snapshot.json"
+   ```
+
+   The clock is set to the snapshot's time, nothing moves between refreshes, avatars are the real
+   GitHub ones, and nothing is saved over the phone's real board or token.
+
+The listing uses this board, not the Sample board: Addison has approved the people on it, with
+their logins and avatars, for the App Store and the exported PNGs here. Keep the roster, snapshot
+and raw renders out of the repo.
+
 ## Upload
 
 Upload to a version that's still being prepared: App Store Connect locks a version's screenshots

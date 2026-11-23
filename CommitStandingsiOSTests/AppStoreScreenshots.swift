@@ -149,7 +149,7 @@ enum AppStoreScreenshots {
 
     /// App Store Connect refuses screenshots with an alpha channel, so the frame is flattened onto
     /// an RGB bitmap with no alpha and written with ImageIO (`UIImage.pngData()` keeps RGBA).
-    private static func opaquePNG(_ view: some View) throws -> Data {
+    static func opaquePNG(_ view: some View) throws -> Data {
         let renderer = ImageRenderer(content: view)
         renderer.scale = 3
         renderer.isOpaque = true
@@ -272,14 +272,18 @@ private struct PhoneFrame<Screen: View>: View {
 
 // MARK: - Screens (440 × 956 pt)
 
-/// The status bar and Dynamic Island of a 6.9" iPhone at 9:41, with the home indicator.
-private struct DeviceChrome: View {
+/// The status bar and Dynamic Island of a 6.9" iPhone at 9:41, with the home indicator. The Lock
+/// Screen leaves the time out of the status bar, under its own clock.
+struct DeviceChrome: View {
+    var isLockScreen = false
+
     var body: some View {
         ZStack(alignment: .top) {
             Capsule().fill(.black).frame(width: 126, height: 37).padding(.top, 11)
             HStack {
                 Text("9:41")
                     .font(.system(size: 17, weight: .semibold))
+                    .opacity(isLockScreen ? 0 : 1)
                     .frame(width: 120)
                 Spacer()
                 HStack(spacing: 6) {
@@ -302,7 +306,7 @@ private struct DeviceChrome: View {
 }
 
 /// A capture of the app's window, under the status bar.
-private struct AppScreen: View {
+struct AppScreen: View {
     let image: UIImage
 
     var body: some View {
@@ -315,7 +319,7 @@ private struct AppScreen: View {
 }
 
 /// A dark wallpaper lit with the site's contribution squares.
-private struct Wallpaper: View {
+struct Wallpaper: View {
     var light: UnitPoint
 
     var body: some View {
@@ -326,8 +330,7 @@ private struct Wallpaper: View {
     }
 }
 
-/// The Lock Screen at 9:41 with Committed's accessory widgets under the clock and Live rank's card
-/// at the bottom.
+/// The Lock Screen at 9:41 with Live rank's card at the bottom.
 private struct LockScreen: View {
     let surfaces: SampleBoardSurfaces
 
@@ -335,25 +338,7 @@ private struct LockScreen: View {
         ZStack {
             Wallpaper(light: UnitPoint(x: 0.5, y: 0.95))
             VStack(spacing: 0) {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 20, weight: .semibold))
-                    .padding(.top, 70)
-                Text("Sunday, November 8")
-                    .font(.system(size: 21, weight: .semibold))
-                    .padding(.top, 10)
-                Text("9:41")
-                    .font(.system(size: 112, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .padding(.top, -10)
-                HStack(spacing: 14) {
-                    LockScreenAccessory(size: SurfaceSize.accessoryRectangular) {
-                        CommittedWidgetRectangular(snapshot: surfaces.snapshot).padding(.horizontal, 8)
-                    }
-                    LockScreenAccessory(size: SurfaceSize.accessoryCircular) {
-                        CommittedWidgetCircular(snapshot: surfaces.snapshot)
-                    }
-                }
-                .padding(.top, 2)
+                LockScreenClock(date: "Sun Nov 8")
                 Spacer(minLength: 0)
                 LockScreenLiveActivity(state: surfaces.liveRank, selfLogin: surfaces.selfLogin)
                 HStack {
@@ -368,11 +353,37 @@ private struct LockScreen: View {
             .foregroundStyle(.white)
         }
         .frame(width: AppStoreScreenshots.size.width, height: AppStoreScreenshots.size.height)
-        .overlay { DeviceChrome() }
+        .overlay { DeviceChrome(isLockScreen: true) }
     }
 }
 
-private struct LockScreenButton: View {
+/// The date and the time as iOS 27's Lock Screen sets them: "Sun Nov 22" over a tall, narrow
+/// clock in white glass. (Locked, iOS also shows a padlock in the Dynamic Island; it's left out
+/// because the screenshot editor's device frames draw their own island over the screen.)
+struct LockScreenClock: View {
+    let date: String
+
+    /// "Sun Nov 22", as the Lock Screen writes the day.
+    static func date(_ day: Date) -> String {
+        [day.formatted(.dateTime.weekday(.abbreviated)), day.formatted(.dateTime.month(.abbreviated)),
+         day.formatted(.dateTime.day())].joined(separator: " ")
+    }
+
+    var body: some View {
+        VStack(spacing: -30) {
+            Text(date)
+                .font(.system(size: 25, weight: .semibold))
+            Text("9:41")
+                .font(.system(size: 172, weight: .semibold))
+                .fontWidth(.condensed)
+                .foregroundStyle(LinearGradient(colors: [.white, .white.opacity(0.82)], startPoint: .top, endPoint: .bottom))
+                .shadow(color: .black.opacity(0.22), radius: 14, y: 4)
+        }
+        .padding(.top, 64)
+    }
+}
+
+struct LockScreenButton: View {
     let symbol: String
 
     var body: some View {
@@ -385,7 +396,7 @@ private struct LockScreenButton: View {
 
 /// The Home Screen with every Committed widget: the rank card and the Committed Board widget,
 /// then the medium and large widgets.
-private struct HomeScreen: View {
+struct HomeScreen: View {
     let snapshot: WidgetSnapshot
 
     var body: some View {
@@ -417,7 +428,7 @@ private struct HomeScreen: View {
 /// The real app in a window at 440 × 956 pt, with a 6.9" iPhone's safe areas (status bar and home
 /// indicator) and its bars at the bottom rather than in the iPhone Duo's side bar.
 @MainActor
-private final class AppScreenWindow {
+final class AppScreenWindow {
     private let window: UIWindow
     private let controller: UIViewController
 
@@ -492,7 +503,7 @@ private final class AppScreenWindow {
 }
 
 @MainActor
-private final class StillBackgroundTime: BackgroundTimeProviding {
+final class StillBackgroundTime: BackgroundTimeProviding {
     func begin(_ name: String) -> Int { 0 }
     func end(_ token: Int) {}
 }
